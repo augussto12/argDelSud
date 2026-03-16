@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import api from '../../shared/api/client';
 import type { Taller, Dia, ApiResponse } from '../../shared/types';
 import {
-  Search, Loader2, Building2, Clock, User, Plus, Pencil, Trash2,
+  Search, Building2, Clock, User, Plus, Pencil, Trash2,
   Eye, UserPlus, ChevronDown, X
 } from 'lucide-react';
+import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface Profesor { id: number; nombre: string; apellido: string }
 interface DiaForm { dia_id: number; hora_inicio: string; hora_fin: string }
@@ -35,6 +36,7 @@ export default function TalleresPage() {
   const [alumnoSearch, setAlumnoSearch] = useState('');
   const [savingLoad, setSavingLoad] = useState(false);
   const [mensaje, setMensaje] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const fetchTalleres = useCallback(async () => {
     setLoading(true);
@@ -93,6 +95,19 @@ export default function TalleresPage() {
   };
 
   const handleSubmit = async () => {
+    // Per-field validation
+    const errs: Record<string, string> = {};
+    if (!form.nombre.trim()) errs.nombre = 'El nombre es obligatorio';
+    else if (form.nombre.trim().length < 2) errs.nombre = 'Mínimo 2 caracteres';
+    if (!form.precio_mensual || parseFloat(form.precio_mensual) <= 0) errs.precio_mensual = 'Ingresá un precio válido mayor a 0';
+    if (!form.cupo_maximo || parseInt(form.cupo_maximo) <= 0) errs.cupo_maximo = 'Ingresá un cupo válido';
+    if (!form.profesor_id) errs.profesor_id = 'Seleccioná un profesor';
+    if (!form.fecha_inicio) errs.fecha_inicio = 'La fecha de inicio es obligatoria';
+    if (!form.fecha_fin) errs.fecha_fin = 'La fecha de fin es obligatoria';
+    if (diasForm.length === 0) errs.dias = 'Agregá al menos un día';
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setSavingLoad(true);
     try {
       const payload = {
@@ -107,15 +122,22 @@ export default function TalleresPage() {
       };
       if (editing) {
         await api.put(`/talleres/${editing.id}`, payload);
-        setMensaje('✅ Taller actualizado');
+        useToastStore.getState().success('Taller actualizado exitosamente');
       } else {
         await api.post('/talleres', payload);
-        setMensaje('✅ Taller creado');
+        useToastStore.getState().success('Taller creado exitosamente');
       }
       setShowModal(false);
       fetchTalleres();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error al guardar'}`);
+      const data = err.response?.data;
+      if (data?.errors?.length) {
+        const srvErrs: Record<string, string> = {};
+        data.errors.forEach((e: any) => { srvErrs[e.campo] = e.mensaje; });
+        setFieldErrors(srvErrs);
+      } else {
+        useToastStore.getState().error(data?.message || 'Error al guardar taller');
+      }
     } finally { setSavingLoad(false); }
   };
 
@@ -123,10 +145,10 @@ export default function TalleresPage() {
     if (!confirm('¿Seguro que querés desactivar este taller?')) return;
     try {
       await api.delete(`/talleres/${id}`);
-      setMensaje('✅ Taller desactivado');
+      useToastStore.getState().success('Taller desactivado');
       fetchTalleres();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al desactivar');
     }
   };
 
@@ -137,7 +159,7 @@ export default function TalleresPage() {
       const { data } = await api.get(`/talleres/${id}`);
       setDetalleTaller(data.data);
       setShowDetalle(true);
-    } catch { setMensaje('❌ Error cargando detalle'); }
+    } catch { useToastStore.getState().error('Error cargando detalle'); }
   };
 
   // ─── Inscribir ─────────────────────────────────────────────
@@ -170,11 +192,11 @@ export default function TalleresPage() {
     if (!inscribirTallerId) return;
     try {
       await api.post(`/talleres/${inscribirTallerId}/inscribir`, { alumno_id: alumnoId });
-      setMensaje('✅ Alumno inscripto');
+      useToastStore.getState().success('Alumno inscripto exitosamente');
       setShowInscribir(false);
       fetchTalleres();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error al inscribir'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al inscribir');
     }
   };
 
@@ -182,11 +204,11 @@ export default function TalleresPage() {
     if (!confirm('¿Desinscribir al alumno?')) return;
     try {
       await api.delete(`/talleres/${tallerId}/desinscribir/${alumnoId}`);
-      setMensaje('✅ Alumno desinscripto');
-      openDetalle(tallerId); // refresh detail
+      useToastStore.getState().success('Alumno desinscripto');
+      openDetalle(tallerId);
       fetchTalleres();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al desinscribir');
     }
   };
 
@@ -219,9 +241,12 @@ export default function TalleresPage() {
       {/* ═══ Cards grid ═══ */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {loading ? (
-          <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted">
-            <Loader2 size={24} className="animate-spin mb-2 text-accent-400" />
-            Cargando talleres...
+          <div className="col-span-full flex flex-col items-center justify-center py-16">
+            <svg className="w-8 h-8 text-accent-500 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <p className="text-muted font-medium text-sm">Cargando talleres...</p>
           </div>
         ) : talleres.length === 0 ? (
           <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted">
@@ -313,9 +338,11 @@ export default function TalleresPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Nombre</label>
-                  <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
-                    className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" placeholder="Ej: Fútbol Sub-12" />
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Nombre <span className="text-danger-500">*</span></label>
+                  <input type="text" value={form.nombre} maxLength={100}
+                    onChange={e => { setForm({ ...form, nombre: e.target.value }); if (fieldErrors.nombre) setFieldErrors({ ...fieldErrors, nombre: '' }); }}
+                    className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.nombre ? 'border-danger-400' : 'border-card'}`} placeholder="Ej: Fútbol Sub-12" />
+                  {fieldErrors.nombre && <p className="mt-1 text-xs text-danger-500">{fieldErrors.nombre}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Categoría</label>
@@ -328,35 +355,45 @@ export default function TalleresPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Precio Mensual ($)</label>
-                  <input type="number" value={form.precio_mensual} onChange={e => setForm({ ...form, precio_mensual: e.target.value })}
-                    className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" placeholder="10000" />
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Precio Mensual ($) <span className="text-danger-500">*</span></label>
+                  <input type="number" min="0" step="0.01" value={form.precio_mensual}
+                    onChange={e => { setForm({ ...form, precio_mensual: e.target.value }); if (fieldErrors.precio_mensual) setFieldErrors({ ...fieldErrors, precio_mensual: '' }); }}
+                    className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.precio_mensual ? 'border-danger-400' : 'border-card'}`} placeholder="10000" />
+                  {fieldErrors.precio_mensual && <p className="mt-1 text-xs text-danger-500">{fieldErrors.precio_mensual}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Cupo Máximo</label>
-                  <input type="number" value={form.cupo_maximo} onChange={e => setForm({ ...form, cupo_maximo: e.target.value })}
-                    className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Cupo Máximo <span className="text-danger-500">*</span></label>
+                  <input type="number" min="1" step="1" value={form.cupo_maximo}
+                    onChange={e => { setForm({ ...form, cupo_maximo: e.target.value }); if (fieldErrors.cupo_maximo) setFieldErrors({ ...fieldErrors, cupo_maximo: '' }); }}
+                    className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.cupo_maximo ? 'border-danger-400' : 'border-card'}`} />
+                  {fieldErrors.cupo_maximo && <p className="mt-1 text-xs text-danger-500">{fieldErrors.cupo_maximo}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Profesor</label>
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Profesor <span className="text-danger-500">*</span></label>
                   <div className="relative">
-                    <select value={form.profesor_id} onChange={e => setForm({ ...form, profesor_id: e.target.value })}
-                      className="w-full py-2.5 pl-3 pr-8 rounded-lg border border-card bg-card text-body text-sm font-medium appearance-none cursor-pointer">
+                    <select value={form.profesor_id}
+                      onChange={e => { setForm({ ...form, profesor_id: e.target.value }); if (fieldErrors.profesor_id) setFieldErrors({ ...fieldErrors, profesor_id: '' }); }}
+                      className={`w-full py-2.5 pl-3 pr-8 rounded-lg border bg-card text-body text-sm font-medium appearance-none cursor-pointer ${fieldErrors.profesor_id ? 'border-danger-400' : 'border-card'}`}>
                       <option value="">Seleccionar...</option>
                       {profesores.map(p => <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}
                     </select>
                     <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
                   </div>
+                  {fieldErrors.profesor_id && <p className="mt-1 text-xs text-danger-500">{fieldErrors.profesor_id}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Fecha Inicio</label>
-                  <input type="date" value={form.fecha_inicio} onChange={e => setForm({ ...form, fecha_inicio: e.target.value })}
-                    className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Fecha Inicio <span className="text-danger-500">*</span></label>
+                  <input type="date" value={form.fecha_inicio}
+                    onChange={e => { setForm({ ...form, fecha_inicio: e.target.value }); if (fieldErrors.fecha_inicio) setFieldErrors({ ...fieldErrors, fecha_inicio: '' }); }}
+                    className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.fecha_inicio ? 'border-danger-400' : 'border-card'}`} />
+                  {fieldErrors.fecha_inicio && <p className="mt-1 text-xs text-danger-500">{fieldErrors.fecha_inicio}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Fecha Fin</label>
-                  <input type="date" value={form.fecha_fin} onChange={e => setForm({ ...form, fecha_fin: e.target.value })}
-                    className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Fecha Fin <span className="text-danger-500">*</span></label>
+                  <input type="date" value={form.fecha_fin}
+                    onChange={e => { setForm({ ...form, fecha_fin: e.target.value }); if (fieldErrors.fecha_fin) setFieldErrors({ ...fieldErrors, fecha_fin: '' }); }}
+                    className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.fecha_fin ? 'border-danger-400' : 'border-card'}`} />
+                  {fieldErrors.fecha_fin && <p className="mt-1 text-xs text-danger-500">{fieldErrors.fecha_fin}</p>}
                 </div>
               </div>
 

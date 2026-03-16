@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../../shared/api/client';
 import type { Taller, ApiResponse } from '../../shared/types';
 import { Check, X as XIcon, Loader2, ClipboardCheck, ChevronDown } from 'lucide-react';
+import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface AsistenciaEntry {
   alumno: { id: number; nombre: string; apellido: string; dni: string };
@@ -52,9 +53,8 @@ export default function AsistenciaPage() {
     try {
       const asistencias = lista.map(item => ({ alumno_id: item.alumno.id, presente: item.presente === true }));
       await api.post('/asistencias', { taller_id: selectedTaller, fecha, asistencias });
-      setMessage('Asistencia guardada correctamente');
-      setTimeout(() => setMessage(''), 4000);
-    } catch { setMessage('Error al guardar'); }
+      useToastStore.getState().success('Asistencia guardada correctamente');
+    } catch { useToastStore.getState().error('Error al guardar asistencia'); }
     finally { setSaving(false); }
   };
 
@@ -113,9 +113,12 @@ export default function AsistenciaPage() {
 
           {/* List */}
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted">
-              <Loader2 size={24} className="animate-spin mb-2 text-accent-400" />
-              Cargando...
+            <div className="flex flex-col items-center justify-center py-16">
+              <svg className="w-8 h-8 text-accent-500 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <p className="text-muted font-medium text-sm">Cargando lista...</p>
             </div>
           ) : lista.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted">

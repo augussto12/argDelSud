@@ -6,7 +6,7 @@ import {
 } from "./cuotas.controller";
 import { validate } from "../../shared/middlewares/validate";
 import { generarCuotasSchema, registrarPagoSchema, generarMasivoSchema } from "./cuotas.validator";
-import { authenticateToken } from "../../shared/middlewares/authMiddleware";
+import { authenticateToken, authorizeRole } from "../../shared/middlewares/authMiddleware";
 
 const router = Router();
 
@@ -17,13 +17,13 @@ router.get("/", getCuotas);
 router.get("/deudores", getDeudores);
 router.get("/cuenta/:alumno_id", getCuentaAlumno);
 router.get("/:id", getCuotaById);
-router.post("/generar", validate(generarCuotasSchema), generarCuotas);
-router.post("/generar-masivo", validate(generarMasivoSchema), generarCuotasMasivo);
-router.patch("/:id/anular", anularCuota);
+router.post("/generar", authorizeRole(["superadmin", "admin"]), validate(generarCuotasSchema), generarCuotas);
+router.post("/generar-masivo", authorizeRole(["superadmin", "admin"]), validate(generarMasivoSchema), generarCuotasMasivo);
+router.patch("/:id/anular", authorizeRole(["superadmin", "admin"]), anularCuota);
 
 // ─── Pagos ───────────────────────────────────────────
 router.get("/pagos", getPagos);
-router.post("/pagos", validate(registrarPagoSchema), registrarPago);
-router.delete("/pagos/:id", deletePago);
+router.post("/pagos", authorizeRole(["superadmin", "admin"]), validate(registrarPagoSchema), registrarPago);
+router.delete("/pagos/:id", authorizeRole(["superadmin", "admin"]), deletePago);
 
 export default router;

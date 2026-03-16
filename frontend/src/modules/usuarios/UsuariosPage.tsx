@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, Plus, Pencil, UserX, ChevronDown, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Shield, Plus, Pencil, UserX, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import api from '../../shared/api/client';
+import TableLoader from '../../shared/components/TableLoader';
+import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface Usuario {
   id: number;
@@ -27,6 +29,7 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState(true);
   const [mensaje, setMensaje] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const fetchUsuarios = useCallback(async () => {
     try {
@@ -58,6 +61,18 @@ export default function UsuariosPage() {
   };
 
   const handleSubmit = async () => {
+    // Per-field validation
+    const errs: Record<string, string> = {};
+    if (!form.nombre.trim()) errs.nombre = 'El nombre es obligatorio';
+    else if (form.nombre.trim().length < 2) errs.nombre = 'Mínimo 2 caracteres';
+    if (!form.email.trim()) errs.email = 'El email es obligatorio';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Formato de email inválido';
+    if (!editing && !form.password) errs.password = 'La contraseña es obligatoria';
+    else if (form.password && form.password.length < 6) errs.password = 'Mínimo 6 caracteres';
+    if (!form.rol_id) errs.rol_id = 'Seleccioná un rol';
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setLoading(true);
     try {
       if (editing) {
@@ -68,7 +83,7 @@ export default function UsuariosPage() {
         };
         if (form.password) payload.password = form.password;
         await api.put(`/usuarios/${editing.id}`, payload);
-        setMensaje('✅ Usuario actualizado');
+        useToastStore.getState().success('Usuario actualizado exitosamente');
       } else {
         await api.post('/usuarios', {
           nombre: form.nombre,
@@ -76,14 +91,21 @@ export default function UsuariosPage() {
           password: form.password,
           rol_id: parseInt(form.rol_id),
         });
-        setMensaje('✅ Usuario creado');
+        useToastStore.getState().success('Usuario creado exitosamente');
       }
       setShowModal(false);
       fetchUsuarios();
     } catch (err: any) {
-      const msg = err.response?.data?.message;
-      if (msg?.includes('email')) setMensaje('❌ Ya existe un usuario con ese email.');
-      else setMensaje(`❌ ${msg || 'Error al guardar. Verificá los datos e intentá de nuevo.'}`);
+      const data = err.response?.data;
+      if (data?.errors?.length) {
+        const srvErrs: Record<string, string> = {};
+        data.errors.forEach((e: any) => { srvErrs[e.campo] = e.mensaje; });
+        setFieldErrors(srvErrs);
+      } else {
+        const msg = data?.message;
+        if (msg?.includes('email')) setFieldErrors({ email: 'Ya existe un usuario con ese email.' });
+        else useToastStore.getState().error(msg || 'Error al guardar.');
+      }
     } finally { setLoading(false); }
   };
 
@@ -91,10 +113,10 @@ export default function UsuariosPage() {
     if (!confirm('¿Seguro que querés desactivar este usuario?')) return;
     try {
       await api.delete(`/usuarios/${id}`);
-      setMensaje('✅ Usuario desactivado');
+      useToastStore.getState().success('Usuario desactivado');
       fetchUsuarios();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al desactivar');
     }
   };
 
@@ -153,10 +175,7 @@ export default function UsuariosPage() {
             </thead>
             <tbody>
               {loadingPage ? (
-                <tr><td colSpan={6} className="text-center py-16">
-                  <Loader2 size={24} className="animate-spin inline-block mb-2 text-accent-400" /><br />
-                  <span className="text-muted font-medium">Cargando usuarios...</span>
-                </td></tr>
+                <TableLoader colSpan={6} text="Cargando usuarios..." />
               ) : usuarios.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-16">
@@ -209,28 +228,33 @@ export default function UsuariosPage() {
             <div className="space-y-5">
               <div>
                 <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Nombre <span className="text-danger-500">*</span></label>
-                <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
-                  className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
+                <input type="text" value={form.nombre} maxLength={100} placeholder="Ej: Juan Pérez"
+                  onChange={e => { setForm({ ...form, nombre: e.target.value }); if (fieldErrors.nombre) setFieldErrors({ ...fieldErrors, nombre: '' }); }}
+                  className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.nombre ? 'border-danger-400' : 'border-card'}`} />
+                {fieldErrors.nombre && <p className="mt-1 text-xs text-danger-500">{fieldErrors.nombre}</p>}
               </div>
               <div>
                 <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Email <span className="text-danger-500">*</span></label>
-                <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
-                  className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
+                <input type="email" value={form.email} maxLength={100} placeholder="Ej: juan@email.com"
+                  onChange={e => { setForm({ ...form, email: e.target.value }); if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: '' }); }}
+                  className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.email ? 'border-danger-400' : 'border-card'}`} />
+                {fieldErrors.email && <p className="mt-1 text-xs text-danger-500">{fieldErrors.email}</p>}
               </div>
               <div>
                 <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">
                   Contraseña {!editing && <span className="text-danger-500">*</span>} {editing && <span className="normal-case font-normal">(dejar vacío para no cambiar)</span>}
                 </label>
                 <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} value={form.password}
-                    onChange={e => setForm({ ...form, password: e.target.value })}
-                    className="w-full py-2.5 px-3 pr-10 rounded-lg border border-card bg-card text-body text-sm font-medium"
-                    placeholder={editing ? '••••••' : ''} />
+                  <input type={showPassword ? 'text' : 'password'} value={form.password} maxLength={100}
+                    onChange={e => { setForm({ ...form, password: e.target.value }); if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: '' }); }}
+                    className={`w-full py-2.5 px-3 pr-10 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.password ? 'border-danger-400' : 'border-card'}`}
+                    placeholder={editing ? '••••••' : 'Mínimo 6 caracteres'} />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-body cursor-pointer">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {fieldErrors.password && <p className="mt-1 text-xs text-danger-500">{fieldErrors.password}</p>}
               </div>
               <div>
                 <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Rol <span className="text-danger-500">*</span></label>
@@ -247,7 +271,7 @@ export default function UsuariosPage() {
               <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-card text-body font-semibold hover:bg-surface transition-colors cursor-pointer text-sm">
                 Cancelar
               </button>
-              <button onClick={handleSubmit} disabled={loading || !form.nombre || !form.email || (!editing && !form.password)}
+              <button onClick={handleSubmit} disabled={loading}
                 className="flex-1 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors disabled:opacity-50 cursor-pointer text-sm">
                 {loading ? 'Guardando...' : editing ? 'Actualizar' : 'Crear Usuario'}
               </button>

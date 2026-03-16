@@ -163,8 +163,13 @@
     from { transform: translateX(-100%); }
     to { transform: translateX(0); }
   }
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+  }
 
   .animate-fadeIn { animation: fadeIn 200ms ease-out; }
   .animate-slideUp { animation: slideUp 250ms ease-out; }
   .animate-slideInLeft { animation: slideInLeft 250ms ease-out; }
+  .animate-slideInRight { animation: slideInRight 300ms ease-out; }
 }

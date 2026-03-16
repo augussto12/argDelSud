@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, Search, CreditCard, Ban, ChevronDown,
   Banknote, ArrowRightLeft, Landmark, Eye, AlertTriangle,
-  User, Zap, Filter, UserCheck, X, Loader2, Plus
+  User, Zap
 } from 'lucide-react';
 import api from '../../shared/api/client';
 import PageLoader from '../../shared/components/PageLoader';
+import TableLoader from '../../shared/components/TableLoader';
+import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface CuotaPago {
   id: number;
@@ -118,6 +120,8 @@ export default function TesoreriaPage() {
   // ─── Global ───
   const [loading, setLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState(true);
+  const [loadingCuotas, setLoadingCuotas] = useState(false);
+  const [loadingDeudores, setLoadingDeudores] = useState(false);
   const [mensaje, setMensaje] = useState('');
 
   // ─── Fetch talleres (once) ───
@@ -127,6 +131,7 @@ export default function TesoreriaPage() {
 
   // ─── Fetch cuotas ───
   const fetchCuotas = useCallback(async () => {
+    setLoadingCuotas(true);
     try {
       const params: any = {};
       if (filtroTaller) params.taller_id = filtroTaller;
@@ -136,19 +141,21 @@ export default function TesoreriaPage() {
       const { data } = await api.get('/cuotas', { params });
       setCuotas(data.data || []);
     } catch { setCuotas([]); }
-    finally { setLoadingPage(false); }
+    finally { setLoadingPage(false); setLoadingCuotas(false); }
   }, [filtroTaller, filtroMes, filtroAnio, filtroEstado]);
 
   useEffect(() => { if (activeTab === 'cuotas') fetchCuotas(); }, [fetchCuotas, activeTab]);
 
   // ─── Fetch deudores ───
   const fetchDeudores = useCallback(async () => {
+    setLoadingDeudores(true);
     try {
       const params: any = {};
       if (filtroTallerDeudores) params.taller_id = filtroTallerDeudores;
       const { data } = await api.get('/cuotas/deudores', { params });
       setDeudores(data.data || []);
     } catch { setDeudores([]); }
+    finally { setLoadingDeudores(false); }
   }, [filtroTallerDeudores]);
 
   useEffect(() => { if (activeTab === 'deudores') fetchDeudores(); }, [fetchDeudores, activeTab]);
@@ -183,30 +190,35 @@ export default function TesoreriaPage() {
         mes: filtroMes,
         anio: filtroAnio,
       });
-      setMensaje(`✅ ${data.message}`);
+      useToastStore.getState().success(data.message || 'Cuotas generadas exitosamente');
       fetchCuotas();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error al generar cuotas'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al generar cuotas');
     } finally { setLoading(false); }
   };
 
   const handleRegistrarPago = async () => {
-    if (!selectedCuota || !pagoForm.monto_abonado) return;
+    if (!selectedCuota) return;
+    const monto = parseFloat(pagoForm.monto_abonado);
+    if (!pagoForm.monto_abonado || isNaN(monto) || monto <= 0) {
+      useToastStore.getState().error('Ingresá un monto válido mayor a 0');
+      return;
+    }
     setLoading(true);
     try {
       await api.post('/cuotas/pagos', {
         cuota_id: selectedCuota.id,
-        monto_abonado: parseFloat(pagoForm.monto_abonado),
+        monto_abonado: monto,
         metodo_pago: pagoForm.metodo_pago,
         observaciones: pagoForm.observaciones || null,
       });
-      setMensaje('✅ Pago registrado correctamente');
+      useToastStore.getState().success('Pago registrado correctamente');
       setShowPagoModal(false);
       setPagoForm({ monto_abonado: '', metodo_pago: 'efectivo', observaciones: '' });
       fetchCuotas();
       if (selectedAlumnoId) fetchCuenta(selectedAlumnoId);
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error al registrar pago'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al registrar pago');
     } finally { setLoading(false); }
   };
 
@@ -214,10 +226,10 @@ export default function TesoreriaPage() {
     if (!confirm('¿Seguro que querés anular esta cuota?')) return;
     try {
       await api.patch(`/cuotas/${id}/anular`);
-      setMensaje('✅ Cuota anulada');
+      useToastStore.getState().success('Cuota anulada');
       fetchCuotas();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error al anular'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al anular cuota');
     }
   };
 
@@ -249,6 +261,8 @@ export default function TesoreriaPage() {
   ];
 
   const fmtMoney = (v: string | number) => `$${parseFloat(String(v)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  if (loadingPage) return <PageLoader text="Cargando tesorería..." />;
 
   return (
     <div className="animate-fadeIn">
@@ -349,7 +363,9 @@ export default function TesoreriaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cuotas.length === 0 ? (
+                  {loadingCuotas ? (
+                    <TableLoader colSpan={9} text="Cargando cuotas..." />
+                  ) : cuotas.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="text-center py-16">
                         <DollarSign className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
@@ -449,7 +465,9 @@ export default function TesoreriaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {deudores.length === 0 ? (
+                  {loadingDeudores ? (
+                    <TableLoader colSpan={7} text="Cargando deudores..." />
+                  ) : deudores.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-16">
                         <AlertTriangle className="w-12 h-12 text-secondary-300 mx-auto mb-3" />

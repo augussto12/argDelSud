@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GraduationCap, Plus, Pencil, XCircle, ChevronDown } from 'lucide-react';
 import api from '../../shared/api/client';
+import TableLoader from '../../shared/components/TableLoader';
+import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface Beca {
   id: number;
@@ -32,6 +34,7 @@ export default function BecasPage() {
   const [loading, setLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState(true);
   const [mensaje, setMensaje] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const fetchBecas = useCallback(async () => {
     try {
@@ -76,32 +79,52 @@ export default function BecasPage() {
   };
 
   const handleSubmit = async () => {
+    // Per-field validation
+    const errs: Record<string, string> = {};
+    if (!editingBeca && !form.inscripcion_id) errs.inscripcion_id = 'Seleccioná un alumno inscripto';
+    const pct = parseFloat(form.porcentaje_descuento);
+    if (!form.porcentaje_descuento || isNaN(pct)) errs.porcentaje_descuento = 'Ingresá un porcentaje';
+    else if (pct < 1 || pct > 100) errs.porcentaje_descuento = 'Debe ser entre 1 y 100';
+    if (!form.fecha_inicio) errs.fecha_inicio = 'La fecha de inicio es obligatoria';
+    if (!form.fecha_fin) errs.fecha_fin = 'La fecha de fin es obligatoria';
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setLoading(true);
     try {
       if (editingBeca) {
         const { data } = await api.patch(`/becas/${editingBeca.id}`, {
-          porcentaje_descuento: parseFloat(form.porcentaje_descuento),
+          porcentaje_descuento: pct,
           motivo: form.motivo || null,
           fecha_inicio: form.fecha_inicio,
           fecha_fin: form.fecha_fin,
           aplicar_cuota_actual: form.aplicar_cuota_actual,
         });
-        setMensaje(data.cuotaActualizada ? '✅ Beca actualizada y descuento aplicado a la cuota del mes' : '✅ Beca actualizada');
+        setMensaje(data.cuotaActualizada ? 'Beca actualizada y descuento aplicado a la cuota del mes' : 'Beca actualizada');
+        useToastStore.getState().success(data.cuotaActualizada ? 'Beca actualizada y descuento aplicado' : 'Beca actualizada');
       } else {
         const { data } = await api.post('/becas', {
           inscripcion_id: parseInt(form.inscripcion_id),
-          porcentaje_descuento: parseFloat(form.porcentaje_descuento),
+          porcentaje_descuento: pct,
           motivo: form.motivo || null,
           fecha_inicio: form.fecha_inicio,
           fecha_fin: form.fecha_fin,
           aplicar_cuota_actual: form.aplicar_cuota_actual,
         });
-        setMensaje(data.cuotaActualizada ? '✅ Beca creada y descuento aplicado a la cuota del mes' : '✅ Beca creada correctamente');
+        setMensaje(data.cuotaActualizada ? 'Beca creada y descuento aplicado a la cuota del mes' : 'Beca creada correctamente');
+        useToastStore.getState().success(data.cuotaActualizada ? 'Beca creada y descuento aplicado' : 'Beca creada exitosamente');
       }
       setShowModal(false);
       fetchBecas();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || err.response?.data?.errors?.map((e: any) => e.message).join(', ') || 'Error al guardar beca'}`);
+      const data = err.response?.data;
+      if (data?.errors?.length) {
+        const srvErrs: Record<string, string> = {};
+        data.errors.forEach((e: any) => { srvErrs[e.campo] = e.mensaje; });
+        setFieldErrors(srvErrs);
+      } else {
+        useToastStore.getState().error(data?.message || 'Error al guardar beca');
+      }
     } finally { setLoading(false); }
   };
 
@@ -109,10 +132,10 @@ export default function BecasPage() {
     if (!confirm('¿Seguro que querés desactivar esta beca?')) return;
     try {
       await api.patch(`/becas/${id}/desactivar`);
-      setMensaje('✅ Beca desactivada');
+      useToastStore.getState().success('Beca desactivada');
       fetchBecas();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error'}`);
+      useToastStore.getState().error(err.response?.data?.message || 'Error al desactivar beca');
     }
   };
 
@@ -170,10 +193,7 @@ export default function BecasPage() {
             </thead>
             <tbody>
               {loadingPage ? (
-                <tr><td colSpan={8} className="text-center py-16">
-                  <div className="flex flex-col items-center"><svg className="w-8 h-8 text-accent-500 animate-spin mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  <p className="text-muted font-medium">Cargando becas...</p></div>
-                </td></tr>
+                <TableLoader colSpan={8} text="Cargando becas..." />
               ) : becas.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-16">
@@ -250,7 +270,7 @@ export default function BecasPage() {
                     <>
                       <input type="text" placeholder="Buscar por nombre, apellido o DNI..." value={searchInsc}
                         onChange={e => setSearchInsc(e.target.value)}
-                        className="w-full py-2 px-3 rounded-lg border border-card bg-card text-body text-sm mb-2" />
+                        className={`w-full py-2 px-3 rounded-lg border bg-card text-body text-sm mb-2 ${fieldErrors.inscripcion_id ? 'border-danger-400' : 'border-card'}`} />
                       <div style={{ maxHeight: '180px', overflowY: 'auto' }}
                         className="rounded-lg border border-card">
                         {inscripciones.length === 0 ? (
@@ -258,7 +278,7 @@ export default function BecasPage() {
                         ) : (
                           inscripciones.map(i => (
                             <div key={i.id}
-                              onClick={() => setForm(prev => ({ ...prev, inscripcion_id: String(i.id) }))}
+                              onClick={() => { setForm(prev => ({ ...prev, inscripcion_id: String(i.id) })); if (fieldErrors.inscripcion_id) setFieldErrors({ ...fieldErrors, inscripcion_id: '' }); }}
                               style={{ cursor: 'pointer' }}
                               className="w-full text-left px-3 py-2.5 text-sm border-b border-card last:border-b-0 hover:bg-accent-50 hover:text-accent-700 text-body">
                               {i.alumno.apellido}, {i.alumno.nombre} — {i.taller.nombre}
@@ -268,13 +288,15 @@ export default function BecasPage() {
                       </div>
                     </>
                   )}
+                  {fieldErrors.inscripcion_id && <p className="mt-1 text-xs text-danger-500">{fieldErrors.inscripcion_id}</p>}
                 </div>
               )}
               <div>
                 <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">% Descuento <span className="text-danger-500">*</span></label>
                 <input type="number" min="1" max="100" value={form.porcentaje_descuento}
-                  onChange={e => setForm({ ...form, porcentaje_descuento: e.target.value })}
-                  className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" placeholder="50" />
+                  onChange={e => { setForm({ ...form, porcentaje_descuento: e.target.value }); if (fieldErrors.porcentaje_descuento) setFieldErrors({ ...fieldErrors, porcentaje_descuento: '' }); }}
+                  className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.porcentaje_descuento ? 'border-danger-400' : 'border-card'}`} placeholder="50" />
+                {fieldErrors.porcentaje_descuento && <p className="mt-1 text-xs text-danger-500">{fieldErrors.porcentaje_descuento}</p>}
               </div>
               <div>
                 <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Motivo (opcional)</label>
@@ -284,13 +306,17 @@ export default function BecasPage() {
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Desde <span className="text-danger-500">*</span></label>
-                  <input type="date" value={form.fecha_inicio} onChange={e => setForm({ ...form, fecha_inicio: e.target.value })}
-                    className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
+                  <input type="date" value={form.fecha_inicio}
+                    onChange={e => { setForm({ ...form, fecha_inicio: e.target.value }); if (fieldErrors.fecha_inicio) setFieldErrors({ ...fieldErrors, fecha_inicio: '' }); }}
+                    className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.fecha_inicio ? 'border-danger-400' : 'border-card'}`} />
+                  {fieldErrors.fecha_inicio && <p className="mt-1 text-xs text-danger-500">{fieldErrors.fecha_inicio}</p>}
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Hasta <span className="text-danger-500">*</span></label>
-                  <input type="date" value={form.fecha_fin} onChange={e => setForm({ ...form, fecha_fin: e.target.value })}
-                    className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
+                  <input type="date" value={form.fecha_fin}
+                    onChange={e => { setForm({ ...form, fecha_fin: e.target.value }); if (fieldErrors.fecha_fin) setFieldErrors({ ...fieldErrors, fecha_fin: '' }); }}
+                    className={`w-full py-2.5 px-3 rounded-lg border bg-card text-body text-sm font-medium ${fieldErrors.fecha_fin ? 'border-danger-400' : 'border-card'}`} />
+                  {fieldErrors.fecha_fin && <p className="mt-1 text-xs text-danger-500">{fieldErrors.fecha_fin}</p>}
                 </div>
               </div>
               {/* Checkbox aplicar a cuota actual */}
@@ -308,7 +334,7 @@ export default function BecasPage() {
               <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-card text-body font-semibold hover:bg-surface transition-colors cursor-pointer text-sm">
                 Cancelar
               </button>
-              <button onClick={handleSubmit} disabled={loading || (!editingBeca && !form.inscripcion_id) || !form.porcentaje_descuento || !form.fecha_inicio || !form.fecha_fin}
+              <button onClick={handleSubmit} disabled={loading}
                 className="flex-1 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors disabled:opacity-50 cursor-pointer text-sm">
                 {loading ? 'Guardando...' : editingBeca ? 'Actualizar' : 'Crear Beca'}
               </button>

@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import ToastContainer from '../ToastContainer';
 import { useUIStore } from '../../hooks/useUIStore';
 import { useEffect, useState } from 'react';
 
@@ -28,6 +29,7 @@ export default function MainLayout() {
           <Outlet />
         </main>
       </div>
+      <ToastContainer />
     </div>
   );
 }

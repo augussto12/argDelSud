@@ -20,17 +20,12 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-20 h-16 bg-card border-b border-card flex items-center justify-between px-4 lg:px-6 shrink-0">
-      {/* Left: hamburger (mobile only) + breadcrumbs */}
+      {/* Left: hamburger (mobile only) */}
       <div className="flex items-center gap-3">
         <button onClick={toggleMobileSidebar}
           className="lg:hidden p-2 -ml-2 rounded-lg text-secondary-400 hover:text-secondary-700 hover:bg-secondary-100 transition-colors cursor-pointer">
           <Menu size={20} />
         </button>
-        <nav className="flex items-center gap-1.5 text-sm">
-          <span className="text-muted hidden sm:inline">Club ADS</span>
-          <ChevronRight size={14} className="text-secondary-300 hidden sm:inline" />
-          <span className="text-heading font-semibold">{currentLabel}</span>
-        </nav>
       </div>
 
       {/* Right: theme toggle + user */}

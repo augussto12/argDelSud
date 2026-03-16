@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ScrollText, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../../shared/api/client';
+import TableLoader from '../../shared/components/TableLoader';
 
 interface AuditLog {
   id: number;
@@ -150,7 +151,7 @@ export default function AuditoriaPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="text-center py-16 text-muted">Cargando...</td></tr>
+                <TableLoader colSpan={5} text="Cargando auditoría..." />
               ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-16">
