@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, Search, CreditCard, Ban, ChevronDown,
   Banknote, ArrowRightLeft, Landmark, Eye, AlertTriangle,
-  User, Zap
+  User, Zap, Filter, UserCheck, X, Loader2, Plus
 } from 'lucide-react';
 import api from '../../shared/api/client';
+import PageLoader from '../../shared/components/PageLoader';
 
 interface CuotaPago {
   id: number;
@@ -116,6 +117,7 @@ export default function TesoreriaPage() {
 
   // ─── Global ───
   const [loading, setLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
   // ─── Fetch talleres (once) ───
@@ -134,6 +136,7 @@ export default function TesoreriaPage() {
       const { data } = await api.get('/cuotas', { params });
       setCuotas(data.data || []);
     } catch { setCuotas([]); }
+    finally { setLoadingPage(false); }
   }, [filtroTaller, filtroMes, filtroAnio, filtroEstado]);
 
   useEffect(() => { if (activeTab === 'cuotas') fetchCuotas(); }, [fetchCuotas, activeTab]);

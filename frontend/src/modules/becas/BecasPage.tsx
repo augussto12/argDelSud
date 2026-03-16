@@ -30,6 +30,7 @@ export default function BecasPage() {
   const [editingBeca, setEditingBeca] = useState<Beca | null>(null);
   const [form, setForm] = useState({ inscripcion_id: '', porcentaje_descuento: '', motivo: '', fecha_inicio: '', fecha_fin: '', aplicar_cuota_actual: true });
   const [loading, setLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
   const fetchBecas = useCallback(async () => {
@@ -39,6 +40,7 @@ export default function BecasPage() {
       const { data } = await api.get('/becas', { params });
       setBecas(data.data || []);
     } catch { setBecas([]); }
+    finally { setLoadingPage(false); }
   }, [filtroActiva]);
 
   const fetchInscripciones = useCallback(async () => {
@@ -99,7 +101,7 @@ export default function BecasPage() {
       setShowModal(false);
       fetchBecas();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error al guardar beca'}`);
+      setMensaje(`❌ ${err.response?.data?.message || err.response?.data?.errors?.map((e: any) => e.message).join(', ') || 'Error al guardar beca'}`);
     } finally { setLoading(false); }
   };
 
@@ -167,7 +169,12 @@ export default function BecasPage() {
               </tr>
             </thead>
             <tbody>
-              {becas.length === 0 ? (
+              {loadingPage ? (
+                <tr><td colSpan={8} className="text-center py-16">
+                  <div className="flex flex-col items-center"><svg className="w-8 h-8 text-accent-500 animate-spin mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  <p className="text-muted font-medium">Cargando becas...</p></div>
+                </td></tr>
+              ) : becas.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-16">
                     <GraduationCap className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
@@ -228,7 +235,7 @@ export default function BecasPage() {
             <div className="space-y-5">
               {!editingBeca && (
                 <div>
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Inscripción (Alumno + Taller)</label>
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Inscripción (Alumno + Taller) <span className="text-danger-500">*</span></label>
                   {form.inscripcion_id ? (
                     <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-accent-300 bg-accent-50 text-accent-700 text-sm font-semibold">
                       <span className="flex-1">
@@ -264,7 +271,7 @@ export default function BecasPage() {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">% Descuento</label>
+                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">% Descuento <span className="text-danger-500">*</span></label>
                 <input type="number" min="1" max="100" value={form.porcentaje_descuento}
                   onChange={e => setForm({ ...form, porcentaje_descuento: e.target.value })}
                   className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" placeholder="50" />
@@ -276,12 +283,12 @@ export default function BecasPage() {
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Desde</label>
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Desde <span className="text-danger-500">*</span></label>
                   <input type="date" value={form.fecha_inicio} onChange={e => setForm({ ...form, fecha_inicio: e.target.value })}
                     className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Hasta</label>
+                  <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Hasta <span className="text-danger-500">*</span></label>
                   <input type="date" value={form.fecha_fin} onChange={e => setForm({ ...form, fecha_fin: e.target.value })}
                     className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
                 </div>

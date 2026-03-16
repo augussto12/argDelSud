@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, Plus, Pencil, UserX, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { Shield, Plus, Pencil, UserX, ChevronDown, Eye, EyeOff, Loader2 } from 'lucide-react';
 import api from '../../shared/api/client';
 
 interface Usuario {
@@ -25,6 +25,7 @@ export default function UsuariosPage() {
   const [form, setForm] = useState({ nombre: '', email: '', password: '', rol_id: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
   const fetchUsuarios = useCallback(async () => {
@@ -34,6 +35,7 @@ export default function UsuariosPage() {
       const { data } = await api.get('/usuarios', { params });
       setUsuarios(data.data || []);
     } catch { setUsuarios([]); }
+    finally { setLoadingPage(false); }
   }, [search]);
 
   useEffect(() => { fetchUsuarios(); }, [fetchUsuarios]);
@@ -79,7 +81,9 @@ export default function UsuariosPage() {
       setShowModal(false);
       fetchUsuarios();
     } catch (err: any) {
-      setMensaje(`❌ ${err.response?.data?.message || 'Error al guardar'}`);
+      const msg = err.response?.data?.message;
+      if (msg?.includes('email')) setMensaje('❌ Ya existe un usuario con ese email.');
+      else setMensaje(`❌ ${msg || 'Error al guardar. Verificá los datos e intentá de nuevo.'}`);
     } finally { setLoading(false); }
   };
 
@@ -148,7 +152,12 @@ export default function UsuariosPage() {
               </tr>
             </thead>
             <tbody>
-              {usuarios.length === 0 ? (
+              {loadingPage ? (
+                <tr><td colSpan={6} className="text-center py-16">
+                  <Loader2 size={24} className="animate-spin inline-block mb-2 text-accent-400" /><br />
+                  <span className="text-muted font-medium">Cargando usuarios...</span>
+                </td></tr>
+              ) : usuarios.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-16">
                     <Shield className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
@@ -199,18 +208,18 @@ export default function UsuariosPage() {
             <h3 className="text-xl font-bold text-heading mb-6">{editing ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
             <div className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Nombre</label>
+                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Nombre <span className="text-danger-500">*</span></label>
                 <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
                   className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Email</label>
+                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Email <span className="text-danger-500">*</span></label>
                 <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                   className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">
-                  Contraseña {editing && <span className="normal-case font-normal">(dejar vacío para no cambiar)</span>}
+                  Contraseña {!editing && <span className="text-danger-500">*</span>} {editing && <span className="normal-case font-normal">(dejar vacío para no cambiar)</span>}
                 </label>
                 <div className="relative">
                   <input type={showPassword ? 'text' : 'password'} value={form.password}
@@ -224,7 +233,7 @@ export default function UsuariosPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Rol</label>
+                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Rol <span className="text-danger-500">*</span></label>
                 <div className="relative">
                   <select value={form.rol_id} onChange={e => setForm({ ...form, rol_id: e.target.value })}
                     className="w-full py-2.5 pl-3 pr-8 rounded-lg border border-card bg-card text-body text-sm font-medium appearance-none cursor-pointer">

@@ -134,10 +134,19 @@ function AlumnoFormModal({ alumno, onClose, onSaved }: { alumno: Alumno | null; 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError('');
     try {
+      if (!form.nombre.trim() || !form.apellido.trim() || !form.dni.trim() || !form.fecha_nacimiento) {
+        setError('Completá todos los campos obligatorios (Nombre, Apellido, DNI, Fecha Nacimiento)');
+        setSaving(false);
+        return;
+      }
       if (isEdit) await api.put(`/alumnos/${alumno!.id}`, form);
       else await api.post('/alumnos', form);
       onSaved(); onClose();
-    } catch (err: any) { setError(err.response?.data?.message || 'Error al guardar'); }
+    } catch (err: any) {
+      const msg = err.response?.data?.message;
+      if (msg?.includes('DNI')) setError('Ya existe un alumno con ese DNI. Verificá los datos.');
+      else setError(msg || 'Error al guardar. Verificá los datos e intentá de nuevo.');
+    }
     finally { setSaving(false); }
   };
 
@@ -192,7 +201,9 @@ function FormField({ label, name, value, onChange, type = 'text', required = fal
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">{label}</label>
+      <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+        {label} {required && <span className="text-danger-500">*</span>}
+      </label>
       <input name={name} type={type} value={value} onChange={onChange} required={required}
         className="w-full px-3.5 py-2.5 rounded-xl border bg-input border-input text-sm text-heading placeholder:text-secondary-400 focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400 transition-colors" />
     </div>

@@ -4,6 +4,7 @@ import {
   TrendingUp, Calendar, Percent
 } from 'lucide-react';
 import api from '../../shared/api/client';
+import PageLoader from '../../shared/components/PageLoader';
 
 interface Stats {
   alumnos_activos: number;
@@ -44,11 +45,14 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [recaudacion, setRecaudacion] = useState<RecaudacionData | null>(null);
   const [calendario, setCalendario] = useState<Record<string, CalendarioEntry[]>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/dashboard/stats').then(r => setStats(r.data.data)).catch(() => { });
-    api.get('/dashboard/recaudacion').then(r => setRecaudacion(r.data.data)).catch(() => { });
-    api.get('/dashboard/calendario').then(r => setCalendario(r.data.data || {})).catch(() => { });
+    Promise.all([
+      api.get('/dashboard/stats').then(r => setStats(r.data.data)).catch(() => { }),
+      api.get('/dashboard/recaudacion').then(r => setRecaudacion(r.data.data)).catch(() => { }),
+      api.get('/dashboard/calendario').then(r => setCalendario(r.data.data || {})).catch(() => { }),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const statCards = [
@@ -64,6 +68,8 @@ export default function DashboardPage() {
     : 1;
 
   const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+  if (loading) return <PageLoader text="Cargando dashboard..." />;
 
   return (
     <div className="animate-slideUp space-y-6">
