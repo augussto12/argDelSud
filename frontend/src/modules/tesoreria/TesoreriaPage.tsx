@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  DollarSign, Search, Plus, CreditCard, Ban, ChevronDown,
+  DollarSign, Search, CreditCard, Ban, ChevronDown,
   Banknote, ArrowRightLeft, Landmark, Eye, AlertTriangle,
   User, Zap
 } from 'lucide-react';
@@ -120,7 +120,7 @@ export default function TesoreriaPage() {
 
   // ─── Fetch talleres (once) ───
   useEffect(() => {
-    api.get('/talleres?activo=true').then(r => setTalleres(r.data.data || [])).catch(() => {});
+    api.get('/talleres?activo=true').then(r => setTalleres(r.data.data || [])).catch(() => { });
   }, []);
 
   // ─── Fetch cuotas ───
@@ -267,11 +267,10 @@ export default function TesoreriaPage() {
       <div className="flex gap-1 bg-card border border-card rounded-xl p-1 mb-6">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === t.key
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === t.key
                 ? 'bg-accent-500 text-white shadow-md shadow-accent-500/20'
                 : 'text-muted hover:text-body hover:bg-surface'
-            }`}>
+              }`}>
             <t.icon className="w-4 h-4" />
             {t.label}
           </button>
@@ -465,11 +464,10 @@ export default function TesoreriaPage() {
                           {d.talleres.join(', ')}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                            d.mesesAtraso >= 3 ? 'bg-danger-100 text-danger-700' :
-                            d.mesesAtraso >= 2 ? 'bg-warning-100 text-warning-700' :
-                            'bg-secondary-100 text-secondary-700'
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${d.mesesAtraso >= 3 ? 'bg-danger-100 text-danger-700' :
+                              d.mesesAtraso >= 2 ? 'bg-warning-100 text-warning-700' :
+                                'bg-secondary-100 text-secondary-700'
+                            }`}>
                             {d.mesesAtraso} {d.mesesAtraso === 1 ? 'mes' : 'meses'}
                           </span>
                         </td>
@@ -636,11 +634,10 @@ export default function TesoreriaPage() {
                     const Icon = METODO_ICONS[m];
                     return (
                       <button key={m} type="button" onClick={() => setPagoForm({ ...pagoForm, metodo_pago: m })}
-                        className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border font-medium text-xs transition-all cursor-pointer ${
-                          pagoForm.metodo_pago === m
+                        className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border font-medium text-xs transition-all cursor-pointer ${pagoForm.metodo_pago === m
                             ? 'border-accent-400 bg-accent-50 text-accent-700'
                             : 'border-card bg-card text-muted hover:bg-surface'
-                        }`}>
+                          }`}>
                         <Icon className="w-5 h-5" />
                         {m.charAt(0).toUpperCase() + m.slice(1)}
                       </button>

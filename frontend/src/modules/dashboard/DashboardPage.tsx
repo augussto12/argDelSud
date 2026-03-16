@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Users, GraduationCap, Building2, ClipboardCheck,
-  TrendingUp, Calendar, DollarSign, Percent
+  TrendingUp, Calendar, Percent
 } from 'lucide-react';
 import api from '../../shared/api/client';
 
@@ -46,9 +46,9 @@ export default function DashboardPage() {
   const [calendario, setCalendario] = useState<Record<string, CalendarioEntry[]>>({});
 
   useEffect(() => {
-    api.get('/dashboard/stats').then(r => setStats(r.data.data)).catch(() => {});
-    api.get('/dashboard/recaudacion').then(r => setRecaudacion(r.data.data)).catch(() => {});
-    api.get('/dashboard/calendario').then(r => setCalendario(r.data.data || {})).catch(() => {});
+    api.get('/dashboard/stats').then(r => setStats(r.data.data)).catch(() => { });
+    api.get('/dashboard/recaudacion').then(r => setRecaudacion(r.data.data)).catch(() => { });
+    api.get('/dashboard/calendario').then(r => setCalendario(r.data.data || {})).catch(() => { });
   }, []);
 
   const statCards = [
