@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # ── Backend Node.js + Prisma ──
+  backend:
+    build: ./backend
+    container_name: argdelsud-backend
+    restart: always
+    ports:
+      - "3002:3000"
+    environment:
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - NODE_ENV=production
+    networks:
+      - default
+      - web_network
+      - db_network
+
+  # ── Frontend Vite + Nginx ──
+  frontend:
+    build: ./frontend
+    container_name: argdelsud-frontend
+    restart: always
+    ports:
+      - "8092:80"
+    depends_on:
+      - backend
+    networks:
+      - default
+      - web_network
+
+networks:
+  web_network:
+    external: true
+    name: nginx-proxy-manager_default
+  db_network:
+    external: true
+    name: db-principal_default

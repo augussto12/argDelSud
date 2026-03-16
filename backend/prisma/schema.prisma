@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["argentinos_del_sud"]
+}
+
+model Dia {
+  id         Int         @id @default(autoincrement())
+  nombre     String      @unique @db.VarChar(20)
+  tallerDias TallerDia[]
+
+  @@map("dias")
+  @@schema("argentinos_del_sud")
+}
+
+model Rol {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique @db.VarChar(50)
+  usuarios Usuario[]
+
+  @@map("roles")
+  @@schema("argentinos_del_sud")
+}
+
+model Usuario {
+  id          Int          @id @default(autoincrement())
+  nombre      String       @db.VarChar(100)
+  email       String       @unique @db.VarChar(100)
+  password    String       @db.VarChar(255)
+  rol_id      Int
+  activo      Boolean      @default(true)
+  creado_at   DateTime     @default(now()) @db.Timestamp(6)
+  asistencias Asistencia[] @relation("marcada_por")
+  auditLogs   AuditLog[]
+  pagos       Pago[]       @relation("registrado_por")
+  rol         Rol          @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("usuarios")
+  @@schema("argentinos_del_sud")
+}
+
+model Alumno {
+  id               Int           @id @default(autoincrement())
+  nombre           String        @db.VarChar(100)
+  apellido         String        @db.VarChar(100)
+  dni              String        @unique @db.VarChar(20)
+  fecha_nacimiento DateTime      @db.Date
+  telefono         String?       @db.VarChar(20)
+  telefono_tutor   String?       @db.VarChar(20)
+  nombre_tutor     String?       @db.VarChar(200)
+  direccion        String?
+  notas            String?
+  activo           Boolean       @default(true)
+  creado_at        DateTime      @default(now()) @db.Timestamp(6)
+  asistencias      Asistencia[]
+  inscripciones    Inscripcion[]
+
+  @@index([activo], map: "idx_alumnos_activo")
+  @@index([apellido], map: "idx_alumnos_apellido")
+  @@index([nombre], map: "idx_alumnos_nombre")
+  @@map("alumnos")
+  @@schema("argentinos_del_sud")
+}
+
+model Profesor {
+  id           Int      @id @default(autoincrement())
+  nombre       String   @db.VarChar(100)
+  apellido     String   @db.VarChar(100)
+  dni          String   @unique @db.VarChar(20)
+  especialidad String?  @db.VarChar(100)
+  telefono     String?  @db.VarChar(20)
+  email        String?  @db.VarChar(100)
+  activo       Boolean  @default(true)
+  creado_at    DateTime @default(now()) @db.Timestamp(6)
+  talleres     Taller[]
+
+  @@index([apellido], map: "idx_profesores_apellido")
+  @@map("profesores")
+  @@schema("argentinos_del_sud")
+}
+
+model Taller {
+  id             Int           @id @default(autoincrement())
+  nombre         String        @db.VarChar(100)
+  categoria      String        @db.VarChar(50)
+  precio_mensual Decimal       @db.Decimal(10, 2)
+  cupo_maximo    Int           @default(30)
+  profesor_id    Int
+  fecha_inicio   DateTime      @db.Date
+  fecha_fin      DateTime      @db.Date
+  activo         Boolean       @default(true)
+  creado_at      DateTime      @default(now()) @db.Timestamp(6)
+  asistencias    Asistencia[]
+  inscripciones  Inscripcion[]
+  tallerDias     TallerDia[]
+  profesor       Profesor      @relation(fields: [profesor_id], references: [id], onUpdate: NoAction)
+
+  @@index([activo], map: "idx_talleres_activo")
+  @@index([profesor_id], map: "idx_talleres_profesor")
+  @@map("talleres")
+  @@schema("argentinos_del_sud")
+}
+
+model TallerDia {
+  taller_id   Int
+  dia_id      Int
+  hora_inicio DateTime @db.Time(6)
+  hora_fin    DateTime @db.Time(6)
+  dia         Dia      @relation(fields: [dia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  taller      Taller   @relation(fields: [taller_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([taller_id, dia_id])
+  @@map("taller_dias")
+  @@schema("argentinos_del_sud")
+}
+
+model Inscripcion {
+  id                Int      @id @default(autoincrement())
+  alumno_id         Int
+  taller_id         Int
+  fecha_inscripcion DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
+  activa            Boolean  @default(true)
+  becas             Beca[]
+  cuotas            Cuota[]
+  alumno            Alumno   @relation(fields: [alumno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  taller            Taller   @relation(fields: [taller_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([alumno_id, taller_id])
+  @@index([activa], map: "idx_inscripciones_activa")
+  @@index([alumno_id], map: "idx_inscripciones_alumno")
+  @@index([taller_id], map: "idx_inscripciones_taller")
+  @@map("inscripciones")
+  @@schema("argentinos_del_sud")
+}
+
+model Beca {
+  id                   Int         @id @default(autoincrement())
+  inscripcion_id       Int
+  porcentaje_descuento Decimal     @db.Decimal(5, 2)
+  motivo               String?
+  fecha_inicio         DateTime    @db.Date
+  fecha_fin            DateTime    @db.Date
+  activa               Boolean     @default(true)
+  creado_at            DateTime    @default(now()) @db.Timestamp(6)
+  inscripcion          Inscripcion @relation(fields: [inscripcion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([activa], map: "idx_becas_activa")
+  @@index([inscripcion_id], map: "idx_becas_inscripcion")
+  @@map("becas")
+  @@schema("argentinos_del_sud")
+}
+
+model Cuota {
+  id                 Int         @id @default(autoincrement())
+  inscripcion_id     Int
+  mes                Int
+  anio               Int
+  monto_original     Decimal     @db.Decimal(10, 2)
+  descuento_aplicado Decimal     @default(0) @db.Decimal(10, 2)
+  monto_final        Decimal     @db.Decimal(10, 2)
+  estado             String      @default("pendiente") @db.VarChar(20)
+  creado_at          DateTime    @default(now()) @db.Timestamp(6)
+  inscripcion        Inscripcion @relation(fields: [inscripcion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  pagos              Pago[]
+
+  @@unique([inscripcion_id, mes, anio])
+  @@index([estado], map: "idx_cuotas_estado")
+  @@index([inscripcion_id], map: "idx_cuotas_inscripcion")
+  @@index([anio, mes], map: "idx_cuotas_periodo")
+  @@map("cuotas")
+  @@schema("argentinos_del_sud")
+}
+
+model Pago {
+  id                Int      @id @default(autoincrement())
+  cuota_id          Int
+  monto_abonado     Decimal  @db.Decimal(10, 2)
+  metodo_pago       String   @db.VarChar(30)
+  observaciones     String?
+  registrado_por_id Int
+  creado_at         DateTime @default(now()) @db.Timestamp(6)
+  cuota             Cuota    @relation(fields: [cuota_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  registrado_por    Usuario  @relation("registrado_por", fields: [registrado_por_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([cuota_id], map: "idx_pagos_cuota")
+  @@map("pagos")
+  @@schema("argentinos_del_sud")
+}
+
+model Asistencia {
+  id             Int      @id @default(autoincrement())
+  alumno_id      Int
+  taller_id      Int
+  fecha          DateTime @db.Date
+  presente       Boolean  @default(false)
+  marcada_por_id Int?
+  alumno         Alumno   @relation(fields: [alumno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  marcada_por    Usuario? @relation("marcada_por", fields: [marcada_por_id], references: [id], onUpdate: NoAction)
+  taller         Taller   @relation(fields: [taller_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([alumno_id, taller_id, fecha])
+  @@index([alumno_id], map: "idx_asistencias_alumno")
+  @@index([taller_id, fecha], map: "idx_asistencias_taller_fecha")
+  @@map("asistencias")
+  @@schema("argentinos_del_sud")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  usuario_id Int?
+  accion     String   @db.VarChar(50)
+  entidad    String   @db.VarChar(50)
+  entidad_id Int?
+  detalle    Json?
+  ip         String?  @db.VarChar(45)
+  creado_at  DateTime @default(now()) @db.Timestamp(6)
+  usuario    Usuario? @relation(fields: [usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([creado_at], map: "idx_audit_logs_fecha")
+  @@index([usuario_id], map: "idx_audit_logs_usuario")
+  @@index([entidad], map: "idx_audit_logs_entidad")
+  @@map("audit_logs")
+  @@schema("argentinos_del_sud")
+}
