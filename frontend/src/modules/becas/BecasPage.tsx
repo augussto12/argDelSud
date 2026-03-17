@@ -175,20 +175,76 @@ export default function BecasPage() {
         </div>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-card border border-card rounded-xl overflow-hidden">
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-3">
+        {loadingPage ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <svg className="w-8 h-8 text-accent-500 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <p className="text-muted font-medium text-sm">Cargando becas...</p>
+          </div>
+        ) : becas.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted">
+            <GraduationCap size={32} className="mb-2 text-secondary-200" />
+            <p>No se encontraron becas</p>
+          </div>
+        ) : (
+          becas.map(b => (
+            <div key={b.id} className="bg-card border border-card rounded-xl p-4 space-y-2 animate-fadeIn">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-heading truncate">{b.inscripcion.alumno.apellido}, {b.inscripcion.alumno.nombre}</p>
+                  <p className="text-xs text-muted">DNI: {b.inscripcion.alumno.dni}</p>
+                  <p className="text-xs text-body mt-0.5">{b.inscripcion.taller.nombre}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => openEdit(b)}
+                    className="tap-target rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Editar">
+                    <Pencil className="w-4 h-4 text-muted" />
+                  </button>
+                  {b.activa && (
+                    <button onClick={() => handleDesactivar(b.id)}
+                      className="tap-target rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
+                      <XCircle className="w-4 h-4 text-danger-500" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-accent-100 text-accent-700">
+                  {parseFloat(b.porcentaje_descuento)}%
+                </span>
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  b.activa ? 'bg-success-100 text-success-700' : 'bg-secondary-200 text-secondary-600'
+                }`}>
+                  {b.activa ? 'Activa' : 'Inactiva'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted">
+                <span>{new Date(b.fecha_inicio).toLocaleDateString()} — {new Date(b.fecha_fin).toLocaleDateString()}</span>
+              </div>
+              {b.motivo && <p className="text-xs text-body italic">{b.motivo}</p>}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block bg-card border border-card rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-card bg-surface">
-                <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Alumno</th>
-                <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Taller</th>
-                <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">% Descuento</th>
-                <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Motivo</th>
-                <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Desde</th>
-                <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Hasta</th>
-                <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Estado</th>
-                <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Acciones</th>
+              <tr className="border-b border-card bg-surface-alt">
+                <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Alumno</th>
+                <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Taller</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">% Descuento</th>
+                <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Motivo</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Desde</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Hasta</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Estado</th>
+                <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -227,12 +283,12 @@ export default function BecasPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => openEdit(b)}
-                          className="p-1.5 rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Editar">
+                          className="tap-target rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Editar">
                           <Pencil className="w-4 h-4 text-muted" />
                         </button>
                         {b.activa && (
                           <button onClick={() => handleDesactivar(b.id)}
-                            className="p-1.5 rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
+                            className="tap-target rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
                             <XCircle className="w-4 h-4 text-danger-500" />
                           </button>
                         )}
@@ -250,7 +306,7 @@ export default function BecasPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md p-8 animate-slideUp border border-card">
+          <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 sm:p-8 animate-slideUp border border-card">
             <h3 className="text-xl font-bold text-heading mb-6">{editingBeca ? 'Editar Beca' : 'Nueva Beca'}</h3>
             <div className="space-y-5">
               {!editingBeca && (
@@ -303,7 +359,7 @@ export default function BecasPage() {
                 <input type="text" value={form.motivo} onChange={e => setForm({ ...form, motivo: e.target.value })}
                   className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" placeholder="Situación económica, mérito deportivo..." />
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1">
                   <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Desde <span className="text-danger-500">*</span></label>
                   <input type="date" value={form.fecha_inicio}

@@ -44,7 +44,7 @@ export default function ProfesoresPage() {
           <p className="text-sm text-muted mt-0.5">Gestión del cuerpo docente</p>
         </div>
         <button onClick={() => { setEditing(null); setShowForm(true); }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 transition-colors cursor-pointer shadow-sm">
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-accent-500 to-accent-400 hover:from-accent-600 hover:to-accent-500 text-white font-semibold rounded-xl shadow-lg shadow-accent-500/20 transition-all hover:-translate-y-0.5 cursor-pointer text-sm">
           <Plus size={16} /> Nuevo Profesor
         </button>
       </div>
@@ -55,14 +55,62 @@ export default function ProfesoresPage() {
           className="w-full pl-10 pr-4 py-2.5 rounded-xl border bg-input border-input text-sm text-heading placeholder:text-secondary-400 focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400 transition-colors" />
       </div>
 
-      <div className="bg-card border border-card rounded-xl overflow-hidden">
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <svg className="w-8 h-8 text-accent-500 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <p className="text-muted font-medium text-sm">Cargando profesores...</p>
+          </div>
+        ) : profesores.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted">
+            <GraduationCap size={32} className="mb-2 text-secondary-200" />
+            <p>No se encontraron profesores</p>
+          </div>
+        ) : (
+          profesores.map((p) => (
+            <div key={p.id} className="bg-card border border-card rounded-xl p-4 space-y-2 animate-fadeIn">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-heading truncate">{p.apellido}, {p.nombre}</p>
+                  <code className="text-xs bg-secondary-100 text-secondary-600 px-2 py-0.5 rounded-md">DNI: {p.dni}</code>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => { setEditing(p); setShowForm(true); }}
+                    className="tap-target rounded-lg text-accent-400 hover:bg-accent-50 transition-colors cursor-pointer" title="Editar">
+                    <Pencil size={18} />
+                  </button>
+                  <button onClick={() => handleDelete(p.id)}
+                    className="tap-target rounded-lg text-danger-400 hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
+                    <Ban size={18} />
+                  </button>
+                </div>
+              </div>
+              {p.especialidad && <p className="text-sm text-body">🎓 {p.especialidad}</p>}
+              {p.talleres && p.talleres.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {p.talleres.map(t => (
+                    <span key={t.id} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warning-50 text-warning-500">{t.nombre}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block bg-card border border-card rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-surface-alt border-b border-card">
                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Apellido</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Nombre</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted hidden md:table-cell">DNI</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">DNI</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted hidden lg:table-cell">Especialidad</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted hidden lg:table-cell">Talleres</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Acciones</th>
@@ -80,7 +128,7 @@ export default function ProfesoresPage() {
                   <tr key={p.id} className="border-b border-card hover-row transition-colors">
                     <td className="px-4 py-3 font-semibold text-heading">{p.apellido}</td>
                     <td className="px-4 py-3 text-body">{p.nombre}</td>
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-4 py-3">
                       <code className="text-xs bg-secondary-100 text-secondary-600 px-2 py-0.5 rounded-md">{p.dni}</code>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell text-body">{p.especialidad || '—'}</td>
@@ -94,12 +142,12 @@ export default function ProfesoresPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => { setEditing(p); setShowForm(true); }}
-                          className="p-2 rounded-lg text-accent-400 hover:bg-accent-50 transition-colors cursor-pointer" title="Editar">
-                          <Pencil size={15} />
+                          className="tap-target rounded-lg text-accent-400 hover:bg-accent-50 transition-colors cursor-pointer" title="Editar">
+                          <Pencil size={16} />
                         </button>
                         <button onClick={() => handleDelete(p.id)}
-                          className="p-2 rounded-lg text-danger-400 hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
-                          <Ban size={15} />
+                          className="tap-target rounded-lg text-danger-400 hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
+                          <Ban size={16} />
                         </button>
                       </div>
                     </td>
@@ -174,8 +222,9 @@ function ProfesorFormModal({ profesor, onClose, onSaved }: { profesor: Profesor 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fadeIn" onClick={onClose}>
-      <div className="bg-card border border-card rounded-2xl w-full max-w-lg p-6 animate-slideUp" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative bg-card border border-card rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 animate-slideUp" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-heading">{isEdit ? 'Editar Profesor' : 'Nuevo Profesor'}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-secondary-400 hover:bg-secondary-100 transition-colors cursor-pointer">

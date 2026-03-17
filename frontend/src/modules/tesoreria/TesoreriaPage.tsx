@@ -284,12 +284,12 @@ export default function TesoreriaPage() {
       <div className="flex gap-1 bg-card border border-card rounded-xl p-1 mb-6">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === t.key
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer min-h-[44px] ${activeTab === t.key
                 ? 'bg-accent-500 text-white shadow-md shadow-accent-500/20'
                 : 'text-muted hover:text-body hover:bg-surface'
               }`}>
             <t.icon className="w-4 h-4" />
-            {t.label}
+            <span className="hidden sm:inline">{t.label}</span>
           </button>
         ))}
       </div>
@@ -350,16 +350,16 @@ export default function TesoreriaPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-card bg-surface">
-                    <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Alumno</th>
-                    <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Taller</th>
-                    <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Original</th>
-                    <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Descuento</th>
-                    <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Final</th>
-                    <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Abonado</th>
-                    <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Saldo</th>
-                    <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Estado</th>
-                    <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Acciones</th>
+                  <tr className="border-b border-card bg-surface-alt">
+                    <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Alumno</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Taller</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Original</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Descuento</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Final</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Abonado</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Saldo</th>
+                    <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Estado</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -405,17 +405,17 @@ export default function TesoreriaPage() {
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button onClick={() => { setSelectedCuota(c); setShowDetalle(true); }}
-                                className="p-1.5 rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Ver detalle">
+                                className="tap-target rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Ver detalle">
                                 <Eye className="w-4 h-4 text-muted" />
                               </button>
                               {c.estado === 'pendiente' && (
                                 <>
                                   <button onClick={() => openPago(c)}
-                                    className="p-1.5 rounded-lg hover:bg-success-50 transition-colors cursor-pointer" title="Registrar pago">
+                                    className="tap-target rounded-lg hover:bg-success-50 transition-colors cursor-pointer" title="Registrar pago">
                                     <CreditCard className="w-4 h-4 text-success-600" />
                                   </button>
                                   <button onClick={() => handleAnularCuota(c.id)}
-                                    className="p-1.5 rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Anular">
+                                    className="tap-target rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Anular">
                                     <Ban className="w-4 h-4 text-danger-500" />
                                   </button>
                                 </>
@@ -454,14 +454,14 @@ export default function TesoreriaPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-card bg-surface">
-                    <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Alumno</th>
-                    <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Talleres</th>
-                    <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Meses Atraso</th>
-                    <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Cuotas Pend.</th>
-                    <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Deuda Total</th>
-                    <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Último Pago</th>
-                    <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Detalle</th>
+                  <tr className="border-b border-card bg-surface-alt">
+                    <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Alumno</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Talleres</th>
+                    <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Meses Atraso</th>
+                    <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Cuotas Pend.</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Deuda Total</th>
+                    <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Último Pago</th>
+                    <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Detalle</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -499,7 +499,7 @@ export default function TesoreriaPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => { setSelectedAlumnoId(d.alumno.id); setActiveTab('cuenta'); }}
-                            className="p-1.5 rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Ver cuenta">
+                            className="tap-target rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Ver cuenta">
                             <Eye className="w-4 h-4 text-accent-500" />
                           </button>
                         </td>

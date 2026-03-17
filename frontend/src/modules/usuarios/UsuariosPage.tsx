@@ -159,18 +159,67 @@ export default function UsuariosPage() {
           className="w-full py-2.5 px-4 rounded-lg border border-card bg-card text-body text-sm font-medium placeholder:text-muted" />
       </div>
 
-      {/* Table */}
-      <div className="bg-card border border-card rounded-xl overflow-hidden">
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-3">
+        {loadingPage ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <svg className="w-8 h-8 text-accent-500 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <p className="text-muted font-medium text-sm">Cargando usuarios...</p>
+          </div>
+        ) : usuarios.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted">
+            <Shield size={32} className="mb-2 text-secondary-200" />
+            <p>No se encontraron usuarios</p>
+          </div>
+        ) : (
+          usuarios.map(u => (
+            <div key={u.id} className="bg-card border border-card rounded-xl p-4 space-y-2 animate-fadeIn">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-heading truncate">{u.nombre}</p>
+                  <p className="text-xs text-muted truncate">{u.email}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => openEdit(u)}
+                    className="tap-target rounded-lg text-muted hover:bg-surface transition-colors cursor-pointer" title="Editar">
+                    <Pencil size={18} />
+                  </button>
+                  {u.activo && (
+                    <button onClick={() => handleDesactivar(u.id)}
+                      className="tap-target rounded-lg text-danger-500 hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
+                      <UserX size={18} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {rolBadge(u.rol.nombre)}
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  u.activo ? 'bg-success-100 text-success-700' : 'bg-secondary-200 text-secondary-600'
+                }`}>
+                  {u.activo ? 'Activo' : 'Inactivo'}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block bg-card border border-card rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-card bg-surface">
-                <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Nombre</th>
-                <th className="text-left px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Email</th>
-                <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Rol</th>
-                <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Estado</th>
-                <th className="text-center px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Creado</th>
-                <th className="text-right px-4 py-3 font-bold text-muted uppercase tracking-wider text-xs">Acciones</th>
+              <tr className="border-b border-card bg-surface-alt">
+                <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Nombre</th>
+                <th className="text-left px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Email</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Rol</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Estado</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Creado</th>
+                <th className="text-right px-4 py-3 font-semibold text-muted uppercase tracking-wider text-xs">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -200,12 +249,12 @@ export default function UsuariosPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => openEdit(u)}
-                          className="p-1.5 rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Editar">
+                          className="tap-target rounded-lg hover:bg-surface transition-colors cursor-pointer" title="Editar">
                           <Pencil className="w-4 h-4 text-muted" />
                         </button>
                         {u.activo && (
                           <button onClick={() => handleDesactivar(u.id)}
-                            className="p-1.5 rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
+                            className="tap-target rounded-lg hover:bg-danger-50 transition-colors cursor-pointer" title="Desactivar">
                             <UserX className="w-4 h-4 text-danger-500" />
                           </button>
                         )}
@@ -223,7 +272,7 @@ export default function UsuariosPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md p-8 animate-slideUp border border-card">
+          <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-8 animate-slideUp border border-card">
             <h3 className="text-xl font-bold text-heading mb-6">{editing ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
             <div className="space-y-5">
               <div>

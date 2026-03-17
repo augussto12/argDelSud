@@ -72,14 +72,14 @@ export default function AsistenciaPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative sm:w-72">
           <select value={selectedTaller ?? ''} onChange={(e) => setSelectedTaller(Number(e.target.value) || null)}
-            className="w-full appearance-none px-3.5 py-2.5 pr-10 rounded-xl border bg-input border-input text-sm text-heading cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400 transition-colors">
+            className="w-full appearance-none px-3.5 py-3 pr-10 rounded-xl border bg-input border-input text-sm text-heading cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400 transition-colors min-h-[48px]">
             <option value="">Seleccionar taller...</option>
             {talleres.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
           </select>
           <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-secondary-400 pointer-events-none" />
         </div>
         <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
-          className="sm:w-44 px-3.5 py-2.5 rounded-xl border bg-input border-input text-sm text-heading focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400 transition-colors" />
+          className="sm:w-44 px-3.5 py-3 rounded-xl border bg-input border-input text-sm text-heading focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400 transition-colors min-h-[48px]" />
       </div>
 
       {selectedTaller && (
@@ -101,11 +101,11 @@ export default function AsistenciaPage() {
             </div>
             <div className="flex gap-2">
               <button onClick={() => marcarTodos(true)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-success-50 text-success-600 hover:bg-success-100 transition-colors cursor-pointer">
+                className="px-4 py-2.5 rounded-lg text-sm font-semibold bg-success-50 text-success-600 hover:bg-success-100 transition-colors cursor-pointer min-h-[44px]">
                 ✓ Todos presentes
               </button>
               <button onClick={() => marcarTodos(false)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-danger-50 text-danger-600 hover:bg-danger-100 transition-colors cursor-pointer">
+                className="px-4 py-2.5 rounded-lg text-sm font-semibold bg-danger-50 text-danger-600 hover:bg-danger-100 transition-colors cursor-pointer min-h-[44px]">
                 ✗ Todos ausentes
               </button>
             </div>
@@ -129,9 +129,9 @@ export default function AsistenciaPage() {
             <div className="divide-y divide-secondary-100">
               {lista.map((item) => (
                 <button key={item.alumno.id} onClick={() => togglePresente(item.alumno.id)}
-                  className="w-full flex items-center justify-between px-5 py-3.5 hover-row transition-colors cursor-pointer text-left">
+                  className="w-full flex items-center justify-between px-5 py-4 hover-row transition-colors cursor-pointer text-left">
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 transition-colors ${
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 transition-colors ${
                       item.presente === true ? 'bg-success-500' :
                       item.presente === false ? 'bg-danger-500' :
                       'bg-secondary-300'
@@ -143,27 +143,27 @@ export default function AsistenciaPage() {
                       <p className="text-xs text-muted font-mono">{item.alumno.dni}</p>
                     </div>
                   </div>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${
                     item.presente === true ? 'bg-success-500 text-white' :
                     item.presente === false ? 'bg-danger-500 text-white' :
                     'bg-secondary-100 text-secondary-400 border-2 border-dashed border-secondary-300'
                   }`}>
-                    {item.presente === true ? <Check size={18} /> :
-                     item.presente === false ? <XIcon size={18} /> : '?'}
+                    {item.presente === true ? <Check size={22} /> :
+                     item.presente === false ? <XIcon size={22} /> : '?'}
                   </div>
                 </button>
               ))}
             </div>
           )}
 
-          {/* Save */}
+          {/* Save — sticky on mobile for reach */}
           {lista.length > 0 && (
-            <div className="flex items-center justify-between px-5 py-3 bg-surface-alt border-t border-card">
+            <div className="flex items-center justify-between px-5 py-3 bg-surface-alt border-t border-card sticky-bottom-mobile">
               {message && (
                 <span className={`text-sm font-medium ${message.includes('Error') ? 'text-danger-500' : 'text-success-500'}`}>{message}</span>
               )}
               <button onClick={guardar} disabled={saving}
-                className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 disabled:opacity-50 transition-colors cursor-pointer">
+                className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-500 to-accent-400 hover:from-accent-600 hover:to-accent-500 text-white text-sm font-semibold shadow-lg shadow-accent-500/20 disabled:opacity-50 transition-all cursor-pointer min-h-[44px]">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {saving ? 'Guardando...' : 'Guardar Asistencia'}
               </button>
