@@ -26,26 +26,8 @@ export function configureSecurity(app: Express) {
     });
     app.use("/api/auth", authLimiter);
 
-    // Sanitización XSS: limpia strings en req.body
-    const stripXSS = (value: any): any => {
-        if (typeof value === "string") {
-            return value
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/javascript:/gi, "")
-                .replace(/on\w+\s*=/gi, "");
-        }
-        if (Array.isArray(value)) return value.map(stripXSS);
-        if (value && typeof value === "object") {
-            return Object.fromEntries(
-                Object.entries(value).map(([k, v]) => [k, stripXSS(v)])
-            );
-        }
-        return value;
-    };
-
-    app.use((req, _res, next) => {
-        if (req.body) req.body = stripXSS(req.body);
-        next();
-    });
+    // NOTA: XSS sanitizer custom removido.
+    // Razón: Zod valida inputs en el backend, React escapa outputs en el frontend.
+    // Un sanitizer regex es fácilmente bypasseable y puede corromper datos legítimos.
 }
+

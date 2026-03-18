@@ -36,7 +36,6 @@ export default function TablePagination({
     return pages;
   };
 
-  if (totalItems <= pageSizeOptions[0]) return null;
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-card">

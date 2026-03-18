@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { useUIStore } from '../../hooks/useUIStore';
-import { useAuthStore } from '../../../modules/auth/authStore';
+import { useAuthStore } from '../../hooks/useAuthStore';
 import { Menu, Moon, Sun, ChevronRight } from 'lucide-react';
 
 const routeLabels: Record<string, string> = {

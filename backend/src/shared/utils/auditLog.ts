@@ -1,5 +1,6 @@
 import prisma from "../../prismaClient";
 import { AuthRequest } from "../middlewares/authMiddleware";
+import logger from "./logger";
 
 interface AuditOptions {
     req: AuthRequest;
@@ -30,6 +31,6 @@ export async function auditLog({ req, accion, entidad, entidad_id, detalle }: Au
         });
     } catch (err) {
         // No falla silenciosamente — solo logueamos por si algo sale mal
-        console.error("[AuditLog] Error registrando acción:", err);
+        logger.error({ err }, "[AuditLog] Error registrando acción");
     }
 }

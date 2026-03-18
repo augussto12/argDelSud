@@ -3,6 +3,10 @@ import prisma from "../../prismaClient";
 import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
 import bcrypt from "bcrypt";
+import { auditLog } from "../../shared/utils/auditLog";
+import { parseId } from "../../shared/utils/parseId";
+
+const SALT_ROUNDS = 12;
 
 // ─── Listar usuarios ────────────────────────────────────────
 
@@ -43,7 +47,7 @@ export const getUsuarios = async (req: AuthRequest, res: Response): Promise<void
 
 export const getUsuarioById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const usuario = await prisma.usuario.findUnique({
             where: { id },
             select: {
@@ -79,7 +83,7 @@ export const createUsuario = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        const hashedPassword = await bcrypt.hash(password, 12);
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
         const usuario = await prisma.usuario.create({
             data: { nombre, email, password: hashedPassword, rol_id },
@@ -92,6 +96,8 @@ export const createUsuario = async (req: AuthRequest, res: Response): Promise<vo
             },
         });
 
+        await auditLog({ req, accion: 'crear', entidad: 'usuario', entidad_id: usuario.id, detalle: { nombre, email, rol_id } });
+
         res.status(201).json({ ok: true, data: usuario });
     } catch (err) {
         logger.error({ err }, "Error creando usuario");
@@ -103,12 +109,12 @@ export const createUsuario = async (req: AuthRequest, res: Response): Promise<vo
 
 export const updateUsuario = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const data: any = { ...req.body };
 
         // Si viene password, hashearla
         if (data.password) {
-            data.password = await bcrypt.hash(data.password, 10);
+            data.password = await bcrypt.hash(data.password, SALT_ROUNDS);
         }
 
         const usuario = await prisma.usuario.update({
@@ -122,6 +128,8 @@ export const updateUsuario = async (req: AuthRequest, res: Response): Promise<vo
                 rol: { select: { id: true, nombre: true } },
             },
         });
+
+        await auditLog({ req, accion: 'editar', entidad: 'usuario', entidad_id: id, detalle: { nombre: data.nombre, email: data.email } });
 
         res.json({ ok: true, data: usuario });
     } catch (err: any) {
@@ -138,7 +146,7 @@ export const updateUsuario = async (req: AuthRequest, res: Response): Promise<vo
 
 export const deleteUsuario = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
 
         // No permitir desactivarse a sí mismo
         if (req.user?.id === id) {
@@ -147,6 +155,7 @@ export const deleteUsuario = async (req: AuthRequest, res: Response): Promise<vo
         }
 
         await prisma.usuario.update({ where: { id }, data: { activo: false } });
+        await auditLog({ req, accion: 'desactivar', entidad: 'usuario', entidad_id: id });
         res.json({ ok: true, message: "Usuario desactivado." });
     } catch (err: any) {
         if (err.code === "P2025") {

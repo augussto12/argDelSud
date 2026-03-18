@@ -2,6 +2,8 @@ import { Response } from "express";
 import prisma from "../../prismaClient";
 import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
+import { auditLog } from "../../shared/utils/auditLog";
+import { parseId } from "../../shared/utils/parseId";
 
 export const getProfesores = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -33,7 +35,7 @@ export const getProfesores = async (req: AuthRequest, res: Response): Promise<vo
 
 export const getProfesorById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const profesor = await prisma.profesor.findUnique({
             where: { id },
             include: { talleres: true },
@@ -57,6 +59,7 @@ export const createProfesor = async (req: AuthRequest, res: Response): Promise<v
             return;
         }
         const profesor = await prisma.profesor.create({ data: req.body });
+        await auditLog({ req, accion: 'crear', entidad: 'profesor', entidad_id: profesor.id, detalle: { nombre: profesor.nombre, apellido: profesor.apellido, dni: profesor.dni } });
         res.status(201).json({ ok: true, data: profesor });
     } catch (err) {
         logger.error({ err }, "Error creando profesor");
@@ -66,8 +69,9 @@ export const createProfesor = async (req: AuthRequest, res: Response): Promise<v
 
 export const updateProfesor = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const profesor = await prisma.profesor.update({ where: { id }, data: req.body });
+        await auditLog({ req, accion: 'editar', entidad: 'profesor', entidad_id: id, detalle: req.body });
         res.json({ ok: true, data: profesor });
     } catch (err: any) {
         if (err.code === "P2025") {
@@ -81,8 +85,9 @@ export const updateProfesor = async (req: AuthRequest, res: Response): Promise<v
 
 export const deleteProfesor = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         await prisma.profesor.update({ where: { id }, data: { activo: false } });
+        await auditLog({ req, accion: 'desactivar', entidad: 'profesor', entidad_id: id });
         res.json({ ok: true, message: "Profesor desactivado." });
     } catch (err: any) {
         if (err.code === "P2025") {

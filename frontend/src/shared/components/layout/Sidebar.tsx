@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useUIStore } from '../../hooks/useUIStore';
-import { useAuthStore } from '../../../modules/auth/authStore';
+import { useAuthStore } from '../../hooks/useAuthStore';
 import {
   LayoutDashboard,
   Users,

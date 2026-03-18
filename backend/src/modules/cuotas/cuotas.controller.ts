@@ -4,6 +4,7 @@ import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
 import { Decimal } from "@prisma/client/runtime/library";
 import { auditLog } from "../../shared/utils/auditLog";
+import { parseId } from "../../shared/utils/parseId";
 
 // ─── Listar cuotas con filtros ─────────────────────────────
 
@@ -52,7 +53,7 @@ export const getCuotas = async (req: AuthRequest, res: Response): Promise<void> 
 
 export const getCuotaById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const cuota = await prisma.cuota.findUnique({
             where: { id },
             include: {
@@ -84,92 +85,95 @@ export const getCuotaById = async (req: AuthRequest, res: Response): Promise<voi
     }
 };
 
-// ─── Generar cuotas masivas para un taller+mes+año ──────────
+// ─── Generar cuotas para un taller+mes+año ──────────────────
 // Congela precio del taller y aplica beca vigente
+// Usa transacción para garantizar atomicidad
 
 export const generarCuotas = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const { taller_id, mes, anio } = req.body;
 
-        // 1. Obtener taller con precio
-        const taller = await prisma.taller.findUnique({ where: { id: taller_id } });
-        if (!taller) {
-            res.status(404).json({ ok: false, message: "Taller no encontrado." });
-            return;
-        }
+        const resultado = await prisma.$transaction(async (tx) => {
+            // 1. Obtener taller con precio
+            const taller = await tx.taller.findUnique({ where: { id: taller_id } });
+            if (!taller) {
+                throw { statusCode: 404, message: "Taller no encontrado." };
+            }
 
-        // 2. Obtener inscripciones activas
-        const inscripciones = await prisma.inscripcion.findMany({
-            where: { taller_id, activa: true },
-            include: {
-                becas: {
-                    where: {
-                        activa: true,
-                        fecha_inicio: { lte: new Date(anio, mes - 1, 1) },
-                        fecha_fin: { gte: new Date(anio, mes - 1, 1) },
+            // 2. Obtener inscripciones activas
+            const inscripciones = await tx.inscripcion.findMany({
+                where: { taller_id, activa: true },
+                include: {
+                    becas: {
+                        where: {
+                            activa: true,
+                            fecha_inicio: { lte: new Date(anio, mes - 1, 1) },
+                            fecha_fin: { gte: new Date(anio, mes - 1, 1) },
+                        },
                     },
                 },
-            },
-        });
-
-        if (inscripciones.length === 0) {
-            res.status(400).json({ ok: false, message: "No hay alumnos inscriptos activos en este taller." });
-            return;
-        }
-
-        // 3. Generar cuotas
-        const cuotasCreadas: any[] = [];
-        const cuotasExistentes: number[] = [];
-
-        for (const insc of inscripciones) {
-            // Verificar si ya existe
-            const existing = await prisma.cuota.findUnique({
-                where: { inscripcion_id_mes_anio: { inscripcion_id: insc.id, mes, anio } },
             });
 
-            if (existing) {
-                cuotasExistentes.push(insc.id);
-                continue;
+            if (inscripciones.length === 0) {
+                throw { statusCode: 400, message: "No hay alumnos inscriptos activos en este taller." };
             }
 
-            // Calcular descuento por beca vigente
-            const montoOriginal = taller.precio_mensual;
-            let descuentoAplicado = new Decimal(0);
+            // 3. Generar cuotas dentro de la transacción
+            const cuotasCreadas: any[] = [];
+            const cuotasExistentes: number[] = [];
 
-            if (insc.becas.length > 0) {
-                // Tomar la beca con mayor porcentaje si hay varias
-                const mejorBeca = insc.becas.reduce((prev: any, curr: any) =>
-                    curr.porcentaje_descuento.greaterThan(prev.porcentaje_descuento) ? curr : prev
-                );
-                descuentoAplicado = montoOriginal.mul(mejorBeca.porcentaje_descuento).div(100);
+            for (const insc of inscripciones) {
+                const existing = await tx.cuota.findUnique({
+                    where: { inscripcion_id_mes_anio: { inscripcion_id: insc.id, mes, anio } },
+                });
+
+                if (existing) {
+                    cuotasExistentes.push(insc.id);
+                    continue;
+                }
+
+                const montoOriginal = taller.precio_mensual;
+                let descuentoAplicado = new Decimal(0);
+
+                if (insc.becas.length > 0) {
+                    const mejorBeca = insc.becas.reduce((prev: any, curr: any) =>
+                        curr.porcentaje_descuento.greaterThan(prev.porcentaje_descuento) ? curr : prev
+                    );
+                    descuentoAplicado = montoOriginal.mul(mejorBeca.porcentaje_descuento).div(100);
+                }
+
+                const montoFinal = montoOriginal.minus(descuentoAplicado);
+
+                const cuota = await tx.cuota.create({
+                    data: {
+                        inscripcion_id: insc.id,
+                        mes,
+                        anio,
+                        monto_original: montoOriginal,
+                        descuento_aplicado: descuentoAplicado,
+                        monto_final: montoFinal,
+                    },
+                });
+
+                cuotasCreadas.push(cuota);
             }
 
-            const montoFinal = montoOriginal.minus(descuentoAplicado);
-
-            const cuota = await prisma.cuota.create({
-                data: {
-                    inscripcion_id: insc.id,
-                    mes,
-                    anio,
-                    monto_original: montoOriginal,
-                    descuento_aplicado: descuentoAplicado,
-                    monto_final: montoFinal,
-                },
-            });
-
-            cuotasCreadas.push(cuota);
-        }
-
-        res.status(201).json({
-            ok: true,
-            data: {
+            return {
                 generadas: cuotasCreadas.length,
                 ya_existentes: cuotasExistentes.length,
                 total_inscriptos: inscripciones.length,
                 cuotas: cuotasCreadas,
-            },
+            };
         });
-    } catch (err) {
+
+        await auditLog({ req, accion: 'generar_cuotas', entidad: 'cuota', detalle: { taller_id, mes, anio, ...resultado } });
+
+        res.status(201).json({ ok: true, data: resultado });
+    } catch (err: any) {
+        if (err.statusCode) {
+            res.status(err.statusCode).json({ ok: false, message: err.message });
+            return;
+        }
         logger.error({ err }, "Error generando cuotas");
         res.status(500).json({ ok: false, message: "Error interno del servidor." });
     }
@@ -179,7 +183,7 @@ export const generarCuotas = async (req: AuthRequest, res: Response): Promise<vo
 
 export const anularCuota = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
 
         const cuota = await prisma.cuota.findUnique({ where: { id } });
         if (!cuota) {
@@ -197,6 +201,8 @@ export const anularCuota = async (req: AuthRequest, res: Response): Promise<void
             data: { estado: "anulada" },
         });
 
+        await auditLog({ req, accion: 'anular_cuota', entidad: 'cuota', entidad_id: id, detalle: { estado_anterior: cuota.estado } });
+
         res.json({ ok: true, data: updated });
     } catch (err) {
         logger.error({ err }, "Error anulando cuota");
@@ -205,60 +211,63 @@ export const anularCuota = async (req: AuthRequest, res: Response): Promise<void
 };
 
 // ─── Registrar pago ─────────────────────────────────────────
+// Usa transacción para evitar race conditions de doble pago
 
 export const registrarPago = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const { cuota_id, monto_abonado, metodo_pago, observaciones } = req.body;
 
-        const cuota = await prisma.cuota.findUnique({
-            where: { id: cuota_id },
-            include: { pagos: true },
-        });
-
-        if (!cuota) {
-            res.status(404).json({ ok: false, message: "Cuota no encontrada." });
-            return;
-        }
-
-        if (cuota.estado === "anulada") {
-            res.status(400).json({ ok: false, message: "No se puede pagar una cuota anulada." });
-            return;
-        }
-
-        if (cuota.estado === "pagada") {
-            res.status(400).json({ ok: false, message: "Esta cuota ya está pagada." });
-            return;
-        }
-
-        // Calcular total ya abonado
-        const totalAbonado = cuota.pagos.reduce(
-            (sum: any, p: any) => sum.plus(p.monto_abonado),
-            new Decimal(0)
-        );
-
-        const pago = await prisma.pago.create({
-            data: {
-                cuota_id,
-                monto_abonado,
-                metodo_pago,
-                observaciones,
-                registrado_por_id: req.user!.id,
-            },
-        });
-
-        // Si el total abonado (incluyendo este pago) >= monto_final → marcar pagada
-        const nuevoTotal = totalAbonado.plus(monto_abonado);
-        if (nuevoTotal.greaterThanOrEqualTo(cuota.monto_final)) {
-            await prisma.cuota.update({
+        const resultado = await prisma.$transaction(async (tx) => {
+            const cuota = await tx.cuota.findUnique({
                 where: { id: cuota_id },
-                data: { estado: "pagada" },
+                include: { pagos: true },
             });
+
+            if (!cuota) {
+                throw { statusCode: 404, message: "Cuota no encontrada." };
+            }
+            if (cuota.estado === "anulada") {
+                throw { statusCode: 400, message: "No se puede pagar una cuota anulada." };
+            }
+            if (cuota.estado === "pagada") {
+                throw { statusCode: 400, message: "Esta cuota ya está pagada." };
+            }
+
+            const totalAbonado = cuota.pagos.reduce(
+                (sum: Decimal, p: any) => sum.plus(p.monto_abonado),
+                new Decimal(0)
+            );
+
+            const pago = await tx.pago.create({
+                data: {
+                    cuota_id,
+                    monto_abonado,
+                    metodo_pago,
+                    observaciones,
+                    registrado_por_id: req.user!.id,
+                },
+            });
+
+            // Si el total abonado (incluyendo este pago) >= monto_final → marcar pagada
+            const nuevoTotal = totalAbonado.plus(monto_abonado);
+            if (nuevoTotal.greaterThanOrEqualTo(cuota.monto_final)) {
+                await tx.cuota.update({
+                    where: { id: cuota_id },
+                    data: { estado: "pagada" },
+                });
+            }
+
+            return pago;
+        });
+
+        await auditLog({ req, accion: 'registrar_pago', entidad: 'pago', entidad_id: resultado.id, detalle: { cuota_id, monto_abonado, metodo_pago } });
+
+        res.status(201).json({ ok: true, data: resultado });
+    } catch (err: any) {
+        if (err.statusCode) {
+            res.status(err.statusCode).json({ ok: false, message: err.message });
+            return;
         }
-
-        await auditLog({ req, accion: 'registrar_pago', entidad: 'pago', entidad_id: pago.id, detalle: { cuota_id, monto_abonado, metodo_pago } });
-
-        res.status(201).json({ ok: true, data: pago });
-    } catch (err) {
         logger.error({ err }, "Error registrando pago");
         res.status(500).json({ ok: false, message: "Error interno del servidor." });
     }
@@ -299,46 +308,50 @@ export const getPagos = async (req: AuthRequest, res: Response): Promise<void> =
 };
 
 // ─── Eliminar pago (y recalcular estado cuota) ──────────────
+// Usa transacción para mantener consistencia entre pago y estado de cuota
 
 export const deletePago = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
 
-        const pago = await prisma.pago.findUnique({ where: { id } });
-        if (!pago) {
-            res.status(404).json({ ok: false, message: "Pago no encontrado." });
-            return;
-        }
+        await prisma.$transaction(async (tx) => {
+            const pago = await tx.pago.findUnique({ where: { id } });
+            if (!pago) {
+                throw { statusCode: 404, message: "Pago no encontrado." };
+            }
 
-        // Borrar el pago
-        await prisma.pago.delete({ where: { id } });
+            // Borrar el pago
+            await tx.pago.delete({ where: { id } });
 
-        // Recalcular estado de la cuota
-        const pagosRestantes = await prisma.pago.findMany({
-            where: { cuota_id: pago.cuota_id },
+            // Recalcular estado de la cuota
+            const pagosRestantes = await tx.pago.findMany({
+                where: { cuota_id: pago.cuota_id },
+            });
+
+            const totalAbonado = pagosRestantes.reduce(
+                (sum: Decimal, p: any) => sum.plus(p.monto_abonado),
+                new Decimal(0)
+            );
+
+            const cuota = await tx.cuota.findUnique({ where: { id: pago.cuota_id } });
+            if (cuota && cuota.estado !== "anulada") {
+                const nuevoEstado = totalAbonado.greaterThanOrEqualTo(cuota.monto_final)
+                    ? "pagada"
+                    : "pendiente";
+
+                await tx.cuota.update({
+                    where: { id: pago.cuota_id },
+                    data: { estado: nuevoEstado },
+                });
+            }
         });
 
-        const totalAbonado = pagosRestantes.reduce(
-            (sum: any, p: any) => sum.plus(p.monto_abonado),
-            new Decimal(0)
-        );
-
-        const cuota = await prisma.cuota.findUnique({ where: { id: pago.cuota_id } });
-        if (cuota && cuota.estado !== "anulada") {
-            const nuevoEstado = totalAbonado.greaterThanOrEqualTo(cuota.monto_final)
-                ? "pagada"
-                : "pendiente";
-
-            await prisma.cuota.update({
-                where: { id: pago.cuota_id },
-                data: { estado: nuevoEstado },
-            });
-        }
+        await auditLog({ req, accion: 'eliminar_pago', entidad: 'pago', entidad_id: id });
 
         res.json({ ok: true, message: "Pago eliminado." });
     } catch (err: any) {
-        if (err.code === "P2025") {
-            res.status(404).json({ ok: false, message: "Pago no encontrado." });
+        if (err.statusCode) {
+            res.status(err.statusCode).json({ ok: false, message: err.message });
             return;
         }
         logger.error({ err }, "Error eliminando pago");
@@ -348,108 +361,109 @@ export const deletePago = async (req: AuthRequest, res: Response): Promise<void>
 
 // ─── Generar cuotas MASIVO (todos los talleres activos) ─────
 // Un solo click genera cuotas de todos los inscriptos activos
+// Usa transacción para garantizar atomicidad total
 
 export const generarCuotasMasivo = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const { mes, anio } = req.body;
 
-        // 1. Obtener TODOS los talleres activos
-        const talleres = await prisma.taller.findMany({
-            where: { activo: true },
-            select: { id: true, nombre: true, precio_mensual: true },
-        });
-
-        if (talleres.length === 0) {
-            res.status(400).json({ ok: false, message: "No hay talleres activos." });
-            return;
-        }
-
-        let totalGeneradas = 0;
-        let totalExistentes = 0;
-        const resumenPorTaller: any[] = [];
-
-        for (const taller of talleres) {
-            // 2. Inscripciones activas de este taller
-            const inscripciones = await prisma.inscripcion.findMany({
-                where: { taller_id: taller.id, activa: true },
-                include: {
-                    becas: {
-                        where: {
-                            activa: true,
-                            fecha_inicio: { lte: new Date(anio, mes - 1, 28) },
-                            fecha_fin: { gte: new Date(anio, mes - 1, 1) },
-                        },
-                    },
-                },
+        const resultado = await prisma.$transaction(async (tx) => {
+            // 1. Obtener TODOS los talleres activos
+            const talleres = await tx.taller.findMany({
+                where: { activo: true },
+                select: { id: true, nombre: true, precio_mensual: true },
             });
 
-            let generadas = 0;
-            let existentes = 0;
+            if (talleres.length === 0) {
+                throw { statusCode: 400, message: "No hay talleres activos." };
+            }
 
-            for (const insc of inscripciones) {
-                // Verificar si ya existe
-                const existing = await prisma.cuota.findUnique({
-                    where: { inscripcion_id_mes_anio: { inscripcion_id: insc.id, mes, anio } },
-                });
+            let totalGeneradas = 0;
+            let totalExistentes = 0;
+            const resumenPorTaller: any[] = [];
 
-                if (existing) {
-                    existentes++;
-                    continue;
-                }
-
-                // Calcular descuento por beca vigente
-                const montoOriginal = taller.precio_mensual;
-                let descuentoAplicado = new Decimal(0);
-
-                if (insc.becas.length > 0) {
-                    const mejorBeca = insc.becas.reduce((prev: any, curr: any) =>
-                        curr.porcentaje_descuento.greaterThan(prev.porcentaje_descuento) ? curr : prev
-                    );
-                    descuentoAplicado = montoOriginal.mul(mejorBeca.porcentaje_descuento).div(100);
-                }
-
-                const montoFinal = montoOriginal.minus(descuentoAplicado);
-
-                await prisma.cuota.create({
-                    data: {
-                        inscripcion_id: insc.id,
-                        mes,
-                        anio,
-                        monto_original: montoOriginal,
-                        descuento_aplicado: descuentoAplicado,
-                        monto_final: montoFinal,
+            for (const taller of talleres) {
+                const inscripciones = await tx.inscripcion.findMany({
+                    where: { taller_id: taller.id, activa: true },
+                    include: {
+                        becas: {
+                            where: {
+                                activa: true,
+                                fecha_inicio: { lte: new Date(anio, mes - 1, 28) },
+                                fecha_fin: { gte: new Date(anio, mes - 1, 1) },
+                            },
+                        },
                     },
                 });
 
-                generadas++;
+                let generadas = 0;
+                let existentes = 0;
+
+                for (const insc of inscripciones) {
+                    const existing = await tx.cuota.findUnique({
+                        where: { inscripcion_id_mes_anio: { inscripcion_id: insc.id, mes, anio } },
+                    });
+
+                    if (existing) {
+                        existentes++;
+                        continue;
+                    }
+
+                    const montoOriginal = taller.precio_mensual;
+                    let descuentoAplicado = new Decimal(0);
+
+                    if (insc.becas.length > 0) {
+                        const mejorBeca = insc.becas.reduce((prev: any, curr: any) =>
+                            curr.porcentaje_descuento.greaterThan(prev.porcentaje_descuento) ? curr : prev
+                        );
+                        descuentoAplicado = montoOriginal.mul(mejorBeca.porcentaje_descuento).div(100);
+                    }
+
+                    const montoFinal = montoOriginal.minus(descuentoAplicado);
+
+                    await tx.cuota.create({
+                        data: {
+                            inscripcion_id: insc.id,
+                            mes,
+                            anio,
+                            monto_original: montoOriginal,
+                            descuento_aplicado: descuentoAplicado,
+                            monto_final: montoFinal,
+                        },
+                    });
+
+                    generadas++;
+                }
+
+                totalGeneradas += generadas;
+                totalExistentes += existentes;
+
+                if (generadas > 0 || existentes > 0) {
+                    resumenPorTaller.push({
+                        taller: taller.nombre,
+                        generadas,
+                        existentes,
+                        inscriptos: inscripciones.length,
+                    });
+                }
             }
 
-            totalGeneradas += generadas;
-            totalExistentes += existentes;
+            return { totalGeneradas, totalExistentes, talleres: resumenPorTaller };
+        });
 
-            if (generadas > 0 || existentes > 0) {
-                resumenPorTaller.push({
-                    taller: taller.nombre,
-                    generadas,
-                    existentes,
-                    inscriptos: inscripciones.length,
-                });
-            }
-        }
-
-        logger.info({ mes, anio, totalGeneradas, totalExistentes }, "Cuotas masivas generadas");
-        await auditLog({ req, accion: 'generar_cuotas', entidad: 'cuota', detalle: { mes, anio, totalGeneradas, totalExistentes } });
+        logger.info({ mes, anio, totalGeneradas: resultado.totalGeneradas, totalExistentes: resultado.totalExistentes }, "Cuotas masivas generadas");
+        await auditLog({ req, accion: 'generar_cuotas_masivo', entidad: 'cuota', detalle: { mes, anio, ...resultado } });
 
         res.status(201).json({
             ok: true,
-            data: {
-                totalGeneradas,
-                totalExistentes,
-                talleres: resumenPorTaller,
-            },
-            message: `${totalGeneradas} cuotas generadas. ${totalExistentes} ya existían.`,
+            data: resultado,
+            message: `${resultado.totalGeneradas} cuotas generadas. ${resultado.totalExistentes} ya existían.`,
         });
-    } catch (err) {
+    } catch (err: any) {
+        if (err.statusCode) {
+            res.status(err.statusCode).json({ ok: false, message: err.message });
+            return;
+        }
         logger.error({ err }, "Error generando cuotas masivas");
         res.status(500).json({ ok: false, message: "Error interno del servidor." });
     }
@@ -461,7 +475,6 @@ export const getDeudores = async (req: AuthRequest, res: Response): Promise<void
     try {
         const { taller_id } = req.query;
 
-        // Buscar todas las cuotas pendientes
         const whereClause: any = { estado: "pendiente" };
         if (taller_id) {
             whereClause.inscripcion = { taller_id: parseInt(taller_id as string) };
@@ -521,7 +534,6 @@ export const getDeudores = async (req: AuthRequest, res: Response): Promise<void
             const deudor = deudoresMap.get(alumnoId)!;
             deudor.talleres.add(cuota.inscripcion.taller.nombre);
 
-            // Calcular abonado de esta cuota
             const abonado = cuota.pagos.reduce(
                 (sum: any, p: any) => sum.plus(p.monto_abonado),
                 new Decimal(0)
@@ -540,7 +552,6 @@ export const getDeudores = async (req: AuthRequest, res: Response): Promise<void
 
             deudor.deudaTotal = deudor.deudaTotal.plus(saldo);
 
-            // Último pago
             for (const pago of cuota.pagos) {
                 if (!deudor.ultimoPago || pago.creado_at > deudor.ultimoPago) {
                     deudor.ultimoPago = pago.creado_at;
@@ -548,9 +559,7 @@ export const getDeudores = async (req: AuthRequest, res: Response): Promise<void
             }
         }
 
-        // Convertir a array y calcular meses de atraso
         const deudores = Array.from(deudoresMap.values()).map((d) => {
-            // Mes más antiguo adeudado
             const cuotaMasVieja = d.cuotas[0];
             let mesesAtraso = 0;
             if (cuotaMasVieja) {
@@ -568,7 +577,6 @@ export const getDeudores = async (req: AuthRequest, res: Response): Promise<void
             };
         });
 
-        // Ordenar por meses de atraso (más moroso primero)
         deudores.sort((a, b) => b.mesesAtraso - a.mesesAtraso);
 
         res.json({ ok: true, data: deudores });
@@ -582,9 +590,8 @@ export const getDeudores = async (req: AuthRequest, res: Response): Promise<void
 
 export const getCuentaAlumno = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const alumno_id = parseInt(req.params.alumno_id as string);
+        const alumno_id = parseId(req.params.alumno_id, "alumno_id");
 
-        // Datos del alumno
         const alumno = await prisma.alumno.findUnique({
             where: { id: alumno_id },
             select: { id: true, nombre: true, apellido: true, dni: true },
@@ -595,7 +602,6 @@ export const getCuentaAlumno = async (req: AuthRequest, res: Response): Promise<
             return;
         }
 
-        // Todas las cuotas del alumno (a través de inscripciones)
         const cuotas = await prisma.cuota.findMany({
             where: {
                 inscripcion: { alumno_id },
@@ -614,7 +620,6 @@ export const getCuentaAlumno = async (req: AuthRequest, res: Response): Promise<
             },
         });
 
-        // Calcular resúmenes
         let totalAdeudado = new Decimal(0);
         let totalPagado = new Decimal(0);
         let cuotasPendientes = 0;

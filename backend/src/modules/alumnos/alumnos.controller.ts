@@ -3,6 +3,7 @@ import prisma from "../../prismaClient";
 import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
 import { auditLog } from "../../shared/utils/auditLog";
+import { parseId } from "../../shared/utils/parseId";
 
 export const getAlumnos = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -38,7 +39,7 @@ export const getAlumnos = async (req: AuthRequest, res: Response): Promise<void>
 
 export const getAlumnoById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const alumno = await prisma.alumno.findUnique({
             where: { id },
             include: {
@@ -85,7 +86,7 @@ export const createAlumno = async (req: AuthRequest, res: Response): Promise<voi
 
 export const updateAlumno = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const data = req.body;
         if (data.fecha_nacimiento) data.fecha_nacimiento = new Date(data.fecha_nacimiento);
 
@@ -104,7 +105,7 @@ export const updateAlumno = async (req: AuthRequest, res: Response): Promise<voi
 
 export const deleteAlumno = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         await prisma.alumno.update({ where: { id }, data: { activo: false } });
         await auditLog({ req, accion: 'desactivar', entidad: 'alumno', entidad_id: id });
         res.json({ ok: true, message: "Alumno desactivado." });

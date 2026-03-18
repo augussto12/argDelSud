@@ -3,6 +3,8 @@ import prisma from "../../prismaClient";
 import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
 import { Decimal } from "@prisma/client/runtime/library";
+import { auditLog } from "../../shared/utils/auditLog";
+import { parseId } from "../../shared/utils/parseId";
 
 // ─── Helper: aplicar beca a cuota actual pendiente ──────────
 
@@ -124,6 +126,8 @@ export const createBeca = async (req: AuthRequest, res: Response): Promise<void>
             cuotaActualizada = await aplicarBecaACuotaActual(data.inscripcion_id, data.porcentaje_descuento);
         }
 
+        await auditLog({ req, accion: 'crear', entidad: 'beca', entidad_id: beca.id, detalle: { inscripcion_id: data.inscripcion_id, porcentaje: data.porcentaje_descuento } });
+
         res.status(201).json({
             ok: true,
             data: beca,
@@ -139,7 +143,7 @@ export const createBeca = async (req: AuthRequest, res: Response): Promise<void>
 
 export const updateBeca = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const { aplicar_cuota_actual, ...data } = req.body;
 
         if (data.fecha_inicio) data.fecha_inicio = new Date(data.fecha_inicio);
@@ -164,6 +168,8 @@ export const updateBeca = async (req: AuthRequest, res: Response): Promise<void>
             cuotaActualizada = await aplicarBecaACuotaActual(beca.inscripcion_id, data.porcentaje_descuento);
         }
 
+        await auditLog({ req, accion: 'editar', entidad: 'beca', entidad_id: id, detalle: data });
+
         res.json({
             ok: true,
             data: beca,
@@ -183,12 +189,14 @@ export const updateBeca = async (req: AuthRequest, res: Response): Promise<void>
 
 export const desactivarBeca = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
 
         const beca = await prisma.beca.update({
             where: { id },
             data: { activa: false },
         });
+
+        await auditLog({ req, accion: 'desactivar', entidad: 'beca', entidad_id: id });
 
         res.json({ ok: true, data: beca, message: "Beca desactivada." });
     } catch (err: any) {

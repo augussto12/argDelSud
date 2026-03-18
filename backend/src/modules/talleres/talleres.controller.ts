@@ -2,6 +2,8 @@ import { Response } from "express";
 import prisma from "../../prismaClient";
 import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
+import { auditLog } from "../../shared/utils/auditLog";
+import { parseId } from "../../shared/utils/parseId";
 
 export const getTalleres = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -31,7 +33,7 @@ export const getTalleres = async (req: AuthRequest, res: Response): Promise<void
 
 export const getTallerById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const taller = await prisma.taller.findUnique({
             where: { id },
             include: {
@@ -77,6 +79,8 @@ export const createTaller = async (req: AuthRequest, res: Response): Promise<voi
             },
         });
 
+        await auditLog({ req, accion: 'crear', entidad: 'taller', entidad_id: taller.id, detalle: { nombre: tallerData.nombre } });
+
         res.status(201).json({ ok: true, data: taller });
     } catch (err) {
         logger.error({ err }, "Error creando taller");
@@ -86,33 +90,37 @@ export const createTaller = async (req: AuthRequest, res: Response): Promise<voi
 
 export const updateTaller = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         const { dias, ...tallerData } = req.body;
 
         if (tallerData.fecha_inicio) tallerData.fecha_inicio = new Date(tallerData.fecha_inicio);
         if (tallerData.fecha_fin) tallerData.fecha_fin = new Date(tallerData.fecha_fin);
 
-        // Si vienen días, los reemplazamos
-        if (dias) {
-            await prisma.tallerDia.deleteMany({ where: { taller_id: id } });
-            await prisma.tallerDia.createMany({
-                data: dias.map((d: any) => ({
-                    taller_id: id,
-                    dia_id: d.dia_id,
-                    hora_inicio: new Date(`1970-01-01T${d.hora_inicio}:00`),
-                    hora_fin: new Date(`1970-01-01T${d.hora_fin}:00`),
-                })),
-            });
-        }
+        // Transacción para mantener consistencia entre dias y taller
+        const taller = await prisma.$transaction(async (tx) => {
+            if (dias) {
+                await tx.tallerDia.deleteMany({ where: { taller_id: id } });
+                await tx.tallerDia.createMany({
+                    data: dias.map((d: any) => ({
+                        taller_id: id,
+                        dia_id: d.dia_id,
+                        hora_inicio: new Date(`1970-01-01T${d.hora_inicio}:00`),
+                        hora_fin: new Date(`1970-01-01T${d.hora_fin}:00`),
+                    })),
+                });
+            }
 
-        const taller = await prisma.taller.update({
-            where: { id },
-            data: tallerData,
-            include: {
-                profesor: { select: { id: true, nombre: true, apellido: true } },
-                tallerDias: { include: { dia: true } },
-            },
+            return tx.taller.update({
+                where: { id },
+                data: tallerData,
+                include: {
+                    profesor: { select: { id: true, nombre: true, apellido: true } },
+                    tallerDias: { include: { dia: true } },
+                },
+            });
         });
+
+        await auditLog({ req, accion: 'editar', entidad: 'taller', entidad_id: id, detalle: tallerData });
 
         res.json({ ok: true, data: taller });
     } catch (err: any) {
@@ -127,8 +135,9 @@ export const updateTaller = async (req: AuthRequest, res: Response): Promise<voi
 
 export const deleteTaller = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const id = parseInt(req.params.id as string);
+        const id = parseId(req.params.id);
         await prisma.taller.update({ where: { id }, data: { activo: false } });
+        await auditLog({ req, accion: 'desactivar', entidad: 'taller', entidad_id: id });
         res.json({ ok: true, message: "Taller desactivado." });
     } catch (err: any) {
         if (err.code === "P2025") {
@@ -144,7 +153,7 @@ export const deleteTaller = async (req: AuthRequest, res: Response): Promise<voi
 
 export const inscribirAlumno = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const taller_id = parseInt(req.params.id as string);
+        const taller_id = parseId(req.params.id, "taller_id");
         const { alumno_id } = req.body;
 
         // Verificar cupo
@@ -169,6 +178,8 @@ export const inscribirAlumno = async (req: AuthRequest, res: Response): Promise<
             create: { alumno_id, taller_id },
         });
 
+        await auditLog({ req, accion: 'inscribir_alumno', entidad: 'inscripcion', entidad_id: inscripcion.id, detalle: { alumno_id, taller_id } });
+
         res.status(201).json({ ok: true, data: inscripcion });
     } catch (err) {
         logger.error({ err }, "Error inscribiendo alumno");
@@ -178,13 +189,15 @@ export const inscribirAlumno = async (req: AuthRequest, res: Response): Promise<
 
 export const desinscribirAlumno = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const taller_id = parseInt(req.params.id as string);
-        const alumno_id = parseInt(req.params.alumno_id as string);
+        const taller_id = parseId(req.params.id, "taller_id");
+        const alumno_id = parseId(req.params.alumno_id, "alumno_id");
 
         await prisma.inscripcion.update({
             where: { alumno_id_taller_id: { alumno_id, taller_id } },
             data: { activa: false },
         });
+
+        await auditLog({ req, accion: 'desinscribir_alumno', entidad: 'inscripcion', detalle: { alumno_id, taller_id } });
 
         res.json({ ok: true, message: "Alumno desinscripto." });
     } catch (err: any) {
