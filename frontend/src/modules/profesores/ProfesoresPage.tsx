@@ -3,6 +3,7 @@ import api from '../../shared/api/client';
 import type { Profesor, ApiResponse } from '../../shared/types';
 import { Plus, Search, Pencil, Ban, X, GraduationCap } from 'lucide-react';
 import TableLoader from '../../shared/components/TableLoader';
+import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
 
 export default function ProfesoresPage() {
@@ -11,6 +12,8 @@ export default function ProfesoresPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Profesor | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const fetchData = async () => {
     setLoading(true);
@@ -23,7 +26,9 @@ export default function ProfesoresPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [search]);
+  useEffect(() => { setPage(1); fetchData(); }, [search]);
+
+  const paginatedProfesores = profesores.slice((page - 1) * pageSize, page * pageSize);
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Desactivar este profesor?')) return;
@@ -71,7 +76,7 @@ export default function ProfesoresPage() {
             <p>No se encontraron profesores</p>
           </div>
         ) : (
-          profesores.map((p) => (
+          paginatedProfesores.map((p) => (
             <div key={p.id} className="bg-card border border-card rounded-xl p-4 space-y-2 animate-fadeIn">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -124,7 +129,7 @@ export default function ProfesoresPage() {
                   <GraduationCap size={32} className="inline-block mb-2 text-secondary-200" /><br />No se encontraron profesores
                 </td></tr>
               ) : (
-                profesores.map((p) => (
+                paginatedProfesores.map((p) => (
                   <tr key={p.id} className="border-b border-card hover-row transition-colors">
                     <td className="px-4 py-3 font-semibold text-heading">{p.apellido}</td>
                     <td className="px-4 py-3 text-body">{p.nombre}</td>
@@ -157,6 +162,16 @@ export default function ProfesoresPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="bg-card border border-card rounded-xl overflow-hidden mt-3">
+        <TablePagination
+          currentPage={page}
+          totalItems={profesores.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {showForm && <ProfesorFormModal profesor={editing} onClose={() => setShowForm(false)} onSaved={fetchData} />}

@@ -7,6 +7,7 @@ import {
 import api from '../../shared/api/client';
 import PageLoader from '../../shared/components/PageLoader';
 import TableLoader from '../../shared/components/TableLoader';
+import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface CuotaPago {
@@ -124,6 +125,12 @@ export default function TesoreriaPage() {
   const [loadingDeudores, setLoadingDeudores] = useState(false);
   const [mensaje, setMensaje] = useState('');
 
+  // ─── Pagination state ───
+  const [pageCuotas, setPageCuotas] = useState(1);
+  const [pageSizeCuotas, setPageSizeCuotas] = useState(25);
+  const [pageDeudores, setPageDeudores] = useState(1);
+  const [pageSizeDeudores, setPageSizeDeudores] = useState(25);
+
   // ─── Fetch talleres (once) ───
   useEffect(() => {
     api.get('/talleres?activo=true').then(r => setTalleres(r.data.data || [])).catch(() => { });
@@ -144,7 +151,9 @@ export default function TesoreriaPage() {
     finally { setLoadingPage(false); setLoadingCuotas(false); }
   }, [filtroTaller, filtroMes, filtroAnio, filtroEstado]);
 
-  useEffect(() => { if (activeTab === 'cuotas') fetchCuotas(); }, [fetchCuotas, activeTab]);
+  useEffect(() => { if (activeTab === 'cuotas') { setPageCuotas(1); fetchCuotas(); } }, [fetchCuotas, activeTab]);
+
+  const paginatedCuotas = cuotas.slice((pageCuotas - 1) * pageSizeCuotas, pageCuotas * pageSizeCuotas);
 
   // ─── Fetch deudores ───
   const fetchDeudores = useCallback(async () => {
@@ -158,7 +167,9 @@ export default function TesoreriaPage() {
     finally { setLoadingDeudores(false); }
   }, [filtroTallerDeudores]);
 
-  useEffect(() => { if (activeTab === 'deudores') fetchDeudores(); }, [fetchDeudores, activeTab]);
+  useEffect(() => { if (activeTab === 'deudores') { setPageDeudores(1); fetchDeudores(); } }, [fetchDeudores, activeTab]);
+
+  const paginatedDeudores = deudores.slice((pageDeudores - 1) * pageSizeDeudores, pageDeudores * pageSizeDeudores);
 
   // ─── Search alumnos ───
   useEffect(() => {
@@ -298,8 +309,8 @@ export default function TesoreriaPage() {
       {activeTab === 'cuotas' && (
         <>
           {/* Filtros + botón generar */}
-          <div className="bg-card border border-card rounded-xl p-4 mb-6 flex flex-col sm:flex-row gap-3 items-end">
-            <div className="flex-1 min-w-[150px]">
+          <div className="bg-card border border-card rounded-xl p-4 mb-6 grid grid-cols-2 sm:flex sm:flex-row gap-3 items-end">
+            <div className="col-span-2 sm:flex-1 sm:min-w-[150px]">
               <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Taller</label>
               <div className="relative">
                 <select value={filtroTaller} onChange={e => setFiltroTaller(e.target.value)}
@@ -310,7 +321,7 @@ export default function TesoreriaPage() {
                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
               </div>
             </div>
-            <div className="w-28">
+            <div className="col-span-1 sm:w-28">
               <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Mes</label>
               <div className="relative">
                 <select value={filtroMes} onChange={e => setFiltroMes(parseInt(e.target.value))}
@@ -320,12 +331,12 @@ export default function TesoreriaPage() {
                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
               </div>
             </div>
-            <div className="w-24">
+            <div className="col-span-1 sm:w-24">
               <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Año</label>
               <input type="number" value={filtroAnio} onChange={e => setFiltroAnio(parseInt(e.target.value))}
                 className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
             </div>
-            <div className="w-32">
+            <div className="col-span-1 sm:w-32">
               <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Estado</label>
               <div className="relative">
                 <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}
@@ -339,7 +350,7 @@ export default function TesoreriaPage() {
               </div>
             </div>
             <button onClick={handleGenerarMasivo} disabled={loading}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-accent-500 to-accent-400 hover:from-accent-600 hover:to-accent-500 text-white font-semibold rounded-xl shadow-lg shadow-accent-500/20 transition-all hover:-translate-y-0.5 cursor-pointer text-sm whitespace-nowrap disabled:opacity-50">
+              className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-accent-500 to-accent-400 hover:from-accent-600 hover:to-accent-500 text-white font-semibold rounded-xl shadow-lg shadow-accent-500/20 transition-all hover:-translate-y-0.5 cursor-pointer text-sm whitespace-nowrap disabled:opacity-50">
               <Zap className="w-4 h-4" />
               {loading ? 'Generando...' : 'Generar Cuotas del Mes'}
             </button>
@@ -374,7 +385,7 @@ export default function TesoreriaPage() {
                       </td>
                     </tr>
                   ) : (
-                    cuotas.map(c => {
+                    paginatedCuotas.map(c => {
                       const totalAbonado = c.pagos.reduce((s, p) => s + parseFloat(p.monto_abonado), 0);
                       const saldo = parseFloat(c.monto_final) - totalAbonado;
                       return (
@@ -429,6 +440,13 @@ export default function TesoreriaPage() {
                 </tbody>
               </table>
             </div>
+            <TablePagination
+              currentPage={pageCuotas}
+              totalItems={cuotas.length}
+              pageSize={pageSizeCuotas}
+              onPageChange={setPageCuotas}
+              onPageSizeChange={setPageSizeCuotas}
+            />
           </div>
         </>
       )}
@@ -436,8 +454,8 @@ export default function TesoreriaPage() {
       {/* ═══════════════ TAB 2: DEUDORES ═══════════════ */}
       {activeTab === 'deudores' && (
         <>
-          <div className="bg-card border border-card rounded-xl p-4 mb-6 flex gap-3 items-end">
-            <div className="flex-1 min-w-[150px]">
+          <div className="bg-card border border-card rounded-xl p-4 mb-6 flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+            <div className="flex-1 sm:min-w-[150px]">
               <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Filtrar por Taller</label>
               <div className="relative">
                 <select value={filtroTallerDeudores} onChange={e => setFiltroTallerDeudores(e.target.value)}
@@ -475,7 +493,7 @@ export default function TesoreriaPage() {
                       </td>
                     </tr>
                   ) : (
-                    deudores.map(d => (
+                    paginatedDeudores.map(d => (
                       <tr key={d.alumno.id} className="border-b border-card hover-row transition-colors">
                         <td className="px-4 py-3 font-medium text-heading">
                           {d.alumno.apellido}, {d.alumno.nombre}
@@ -509,6 +527,13 @@ export default function TesoreriaPage() {
                 </tbody>
               </table>
             </div>
+            <TablePagination
+              currentPage={pageDeudores}
+              totalItems={deudores.length}
+              pageSize={pageSizeDeudores}
+              onPageChange={setPageDeudores}
+              onPageSizeChange={setPageSizeDeudores}
+            />
           </div>
         </>
       )}

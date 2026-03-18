@@ -134,32 +134,32 @@ export default function MetricasPage() {
       </div>
 
       {/* ═══ Cards secundarias ═══ */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-card border border-card rounded-xl p-4 flex items-center gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="bg-card border border-card rounded-xl p-4 flex items-center gap-3 sm:gap-4">
           <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
             <Users className="w-5 h-5 text-primary-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted font-bold uppercase tracking-wider">Alumnos / Inscripciones</p>
-            <p className="text-lg font-bold text-heading">{resumen.alumnosActivos} <span className="text-sm text-muted font-normal">/ {resumen.inscripcionesActivas} insc.</span></p>
+            <p className="text-base sm:text-lg font-bold text-heading truncate">{resumen.alumnosActivos} <span className="text-sm text-muted font-normal">/ {resumen.inscripcionesActivas} insc.</span></p>
           </div>
         </div>
-        <div className="bg-card border border-card rounded-xl p-4 flex items-center gap-4">
+        <div className="bg-card border border-card rounded-xl p-4 flex items-center gap-3 sm:gap-4">
           <div className="w-10 h-10 rounded-xl bg-accent-100 flex items-center justify-center shrink-0">
             <Award className="w-5 h-5 text-accent-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted font-bold uppercase tracking-wider">Becas otorgadas</p>
-            <p className="text-lg font-bold text-heading">{fmtMoney(resumen.totalBecasDescuento)} <span className="text-sm text-muted font-normal">en descuentos</span></p>
+            <p className="text-base sm:text-lg font-bold text-heading truncate">{fmtMoney(resumen.totalBecasDescuento)} <span className="text-sm text-muted font-normal">en descuentos</span></p>
           </div>
         </div>
-        <div className="bg-card border border-card rounded-xl p-4 flex items-center gap-4">
+        <div className="bg-card border border-card rounded-xl p-4 flex items-center gap-3 sm:gap-4">
           <div className="w-10 h-10 rounded-xl bg-danger-100 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-5 h-5 text-danger-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted font-bold uppercase tracking-wider">Talleres activos</p>
-            <p className="text-lg font-bold text-heading">{rankingTalleres.length}</p>
+            <p className="text-base sm:text-lg font-bold text-heading">{rankingTalleres.length}</p>
           </div>
         </div>
       </div>

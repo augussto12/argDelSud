@@ -3,6 +3,7 @@ import api from '../../shared/api/client';
 import type { Alumno, ApiResponse } from '../../shared/types';
 import { Plus, Search, Pencil, Ban, X, Users } from 'lucide-react';
 import TableLoader from '../../shared/components/TableLoader';
+import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
 
 export default function AlumnosPage() {
@@ -10,6 +11,8 @@ export default function AlumnosPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [editingAlumno, setEditingAlumno] = useState<Alumno | null>(null);
 
   const fetchAlumnos = async () => {
@@ -23,7 +26,9 @@ export default function AlumnosPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAlumnos(); }, [search]);
+  useEffect(() => { setPage(1); fetchAlumnos(); }, [search]);
+
+  const paginatedAlumnos = alumnos.slice((page - 1) * pageSize, page * pageSize);
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Desactivar este alumno?')) return;
@@ -74,7 +79,7 @@ export default function AlumnosPage() {
             <p>No se encontraron alumnos</p>
           </div>
         ) : (
-          alumnos.map((a) => (
+          paginatedAlumnos.map((a) => (
             <div key={a.id} className="bg-card border border-card rounded-xl p-4 space-y-2 animate-fadeIn">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -129,7 +134,7 @@ export default function AlumnosPage() {
                   <Users size={32} className="inline-block mb-2 text-secondary-200" /><br />No se encontraron alumnos
                 </td></tr>
               ) : (
-                alumnos.map((a) => (
+                paginatedAlumnos.map((a) => (
                   <tr key={a.id} className="border-b border-card hover-row transition-colors">
                     <td className="px-4 py-3 font-semibold text-heading">{a.apellido}</td>
                     <td className="px-4 py-3 text-body">{a.nombre}</td>
@@ -164,6 +169,16 @@ export default function AlumnosPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="bg-card border border-card rounded-xl overflow-hidden mt-3">
+        <TablePagination
+          currentPage={page}
+          totalItems={alumnos.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {showForm && <AlumnoFormModal alumno={editingAlumno} onClose={() => setShowForm(false)} onSaved={fetchAlumnos} />}

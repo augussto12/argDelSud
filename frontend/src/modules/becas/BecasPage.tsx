@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { GraduationCap, Plus, Pencil, XCircle, ChevronDown } from 'lucide-react';
 import api from '../../shared/api/client';
 import TableLoader from '../../shared/components/TableLoader';
+import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface Beca {
@@ -35,6 +36,8 @@ export default function BecasPage() {
   const [loadingPage, setLoadingPage] = useState(true);
   const [mensaje, setMensaje] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const fetchBecas = useCallback(async () => {
     try {
@@ -55,8 +58,10 @@ export default function BecasPage() {
     } catch { setInscripciones([]); }
   }, [searchInsc]);
 
-  useEffect(() => { fetchBecas(); }, [fetchBecas]);
+  useEffect(() => { setPage(1); fetchBecas(); }, [fetchBecas]);
   useEffect(() => { if (showModal) fetchInscripciones(); }, [showModal, fetchInscripciones]);
+
+  const paginatedBecas = becas.slice((page - 1) * pageSize, page * pageSize);
 
   const openCreate = () => {
     setEditingBeca(null);
@@ -191,7 +196,7 @@ export default function BecasPage() {
             <p>No se encontraron becas</p>
           </div>
         ) : (
-          becas.map(b => (
+          paginatedBecas.map(b => (
             <div key={b.id} className="bg-card border border-card rounded-xl p-4 space-y-2 animate-fadeIn">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -258,7 +263,7 @@ export default function BecasPage() {
                   </td>
                 </tr>
               ) : (
-                becas.map(b => (
+                paginatedBecas.map(b => (
                   <tr key={b.id} className="border-b border-card hover-row transition-colors">
                     <td className="px-4 py-3 font-medium text-heading">
                       {b.inscripcion.alumno.apellido}, {b.inscripcion.alumno.nombre}
@@ -300,6 +305,16 @@ export default function BecasPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="bg-card border border-card rounded-xl overflow-hidden mt-3">
+        <TablePagination
+          currentPage={page}
+          totalItems={becas.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {/* ═══ Modal: Crear/Editar Beca ═══ */}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Shield, Plus, Pencil, UserX, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import api from '../../shared/api/client';
 import TableLoader from '../../shared/components/TableLoader';
+import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
 
 interface Usuario {
@@ -30,6 +31,8 @@ export default function UsuariosPage() {
   const [loadingPage, setLoadingPage] = useState(true);
   const [mensaje, setMensaje] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const fetchUsuarios = useCallback(async () => {
     try {
@@ -41,7 +44,9 @@ export default function UsuariosPage() {
     finally { setLoadingPage(false); }
   }, [search]);
 
-  useEffect(() => { fetchUsuarios(); }, [fetchUsuarios]);
+  useEffect(() => { setPage(1); fetchUsuarios(); }, [fetchUsuarios]);
+
+  const paginatedUsuarios = usuarios.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => {
     api.get('/usuarios/roles').then(r => setRoles(r.data.data || [])).catch(() => {});
   }, []);
@@ -175,7 +180,7 @@ export default function UsuariosPage() {
             <p>No se encontraron usuarios</p>
           </div>
         ) : (
-          usuarios.map(u => (
+          paginatedUsuarios.map(u => (
             <div key={u.id} className="bg-card border border-card rounded-xl p-4 space-y-2 animate-fadeIn">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -233,7 +238,7 @@ export default function UsuariosPage() {
                   </td>
                 </tr>
               ) : (
-                usuarios.map(u => (
+                paginatedUsuarios.map(u => (
                   <tr key={u.id} className="border-b border-card hover-row transition-colors">
                     <td className="px-4 py-3 font-medium text-heading">{u.nombre}</td>
                     <td className="px-4 py-3 text-body">{u.email}</td>
@@ -266,6 +271,16 @@ export default function UsuariosPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="bg-card border border-card rounded-xl overflow-hidden mt-3">
+        <TablePagination
+          currentPage={page}
+          totalItems={usuarios.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {/* ═══ Modal: Crear/Editar Usuario ═══ */}

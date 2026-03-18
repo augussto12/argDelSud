@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ScrollText, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ScrollText, ChevronDown } from 'lucide-react';
 import api from '../../shared/api/client';
 import TableLoader from '../../shared/components/TableLoader';
+import TablePagination from '../../shared/components/TablePagination';
 
 interface AuditLog {
   id: number;
@@ -43,13 +44,14 @@ export default function AuditoriaPage() {
   const [filtroDesde, setFiltroDesde] = useState('');
   const [filtroHasta, setFiltroHasta] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [pagination, setPagination] = useState({ total: 0, pages: 0 });
   const [loading, setLoading] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const params: any = { page, limit: 30 };
+      const params: any = { page, limit: pageSize };
       if (filtroEntidad) params.entidad = filtroEntidad;
       if (filtroAccion) params.accion = filtroAccion;
       if (filtroDesde) params.desde = filtroDesde;
@@ -59,7 +61,7 @@ export default function AuditoriaPage() {
       setPagination(data.pagination || { total: 0, pages: 0 });
     } catch { setLogs([]); }
     finally { setLoading(false); }
-  }, [page, filtroEntidad, filtroAccion, filtroDesde, filtroHasta]);
+  }, [page, pageSize, filtroEntidad, filtroAccion, filtroDesde, filtroHasta]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
@@ -88,8 +90,8 @@ export default function AuditoriaPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-card border border-card rounded-xl p-4 mb-6 flex flex-col sm:flex-row gap-3 items-end flex-wrap">
-        <div className="w-36">
+      <div className="bg-card border border-card rounded-xl p-4 mb-6 grid grid-cols-2 sm:flex sm:flex-row gap-3 items-end">
+        <div className="col-span-1 sm:w-36">
           <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Entidad</label>
           <div className="relative">
             <select value={filtroEntidad} onChange={e => { setFiltroEntidad(e.target.value); setPage(1); }}
@@ -107,7 +109,7 @@ export default function AuditoriaPage() {
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
           </div>
         </div>
-        <div className="w-40">
+        <div className="col-span-1 sm:w-40">
           <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Acción</label>
           <div className="relative">
             <select value={filtroAccion} onChange={e => { setFiltroAccion(e.target.value); setPage(1); }}
@@ -124,12 +126,12 @@ export default function AuditoriaPage() {
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
           </div>
         </div>
-        <div className="w-36">
+        <div className="col-span-1 sm:w-36">
           <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Desde</label>
           <input type="date" value={filtroDesde} onChange={e => { setFiltroDesde(e.target.value); setPage(1); }}
             className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
         </div>
-        <div className="w-36">
+        <div className="col-span-1 sm:w-36">
           <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Hasta</label>
           <input type="date" value={filtroHasta} onChange={e => { setFiltroHasta(e.target.value); setPage(1); }}
             className="w-full py-2.5 px-3 rounded-lg border border-card bg-card text-body text-sm font-medium" />
@@ -184,25 +186,13 @@ export default function AuditoriaPage() {
           </table>
         </div>
 
-        {/* Paginación */}
-        {pagination.pages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-card">
-            <p className="text-xs text-muted">
-              Mostrando {((page - 1) * 30) + 1} a {Math.min(page * 30, pagination.total)} de {pagination.total}
-            </p>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="p-1.5 rounded-lg hover:bg-surface transition-colors cursor-pointer disabled:opacity-30">
-                <ChevronLeft className="w-4 h-4 text-muted" />
-              </button>
-              <span className="text-sm font-medium text-body px-3">{page} / {pagination.pages}</span>
-              <button onClick={() => setPage(p => Math.min(pagination.pages, p + 1))} disabled={page === pagination.pages}
-                className="p-1.5 rounded-lg hover:bg-surface transition-colors cursor-pointer disabled:opacity-30">
-                <ChevronRight className="w-4 h-4 text-muted" />
-              </button>
-            </div>
-          </div>
-        )}
+        <TablePagination
+          currentPage={page}
+          totalItems={pagination.total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
     </div>
   );
