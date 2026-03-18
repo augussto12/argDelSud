@@ -6,6 +6,7 @@ import Spinner from '../../shared/components/Spinner';
 import TableLoader from '../../shared/components/TableLoader';
 import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
+import { showConfirm } from '../../shared/hooks/useConfirmStore';
 import ProfesorFormModal from './components/ProfesorFormModal';
 
 export default function ProfesoresPage() {
@@ -33,7 +34,8 @@ export default function ProfesoresPage() {
   const paginatedProfesores = profesores.slice((page - 1) * pageSize, page * pageSize);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Desactivar este profesor?')) return;
+    const confirmed = await showConfirm({ title: 'Desactivar profesor', message: '¿Seguro que querés desactivar este profesor?', confirmText: 'Desactivar', variant: 'danger' });
+    if (!confirmed) return;
     try {
       await api.delete(`/profesores/${id}`);
       useToastStore.getState().success('Profesor desactivado');

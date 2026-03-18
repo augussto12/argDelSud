@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../../shared/api/client';
 import { useToastStore } from '../../../shared/hooks/useToastStore';
+import { showConfirm } from '../../../shared/hooks/useConfirmStore';
 
 export interface Beca {
   id: number;
@@ -134,7 +135,8 @@ export function useBecas() {
   };
 
   const handleDesactivar = async (id: number) => {
-    if (!confirm('¿Seguro que querés desactivar esta beca?')) return;
+    const confirmed = await showConfirm({ title: 'Desactivar beca', message: '¿Seguro que querés desactivar esta beca?', confirmText: 'Desactivar', variant: 'danger' });
+    if (!confirmed) return;
     try {
       await api.patch(`/becas/${id}/desactivar`);
       useToastStore.getState().success('Beca desactivada');

@@ -6,6 +6,7 @@ import Spinner from '../../shared/components/Spinner';
 import TableLoader from '../../shared/components/TableLoader';
 import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
+import { showConfirm } from '../../shared/hooks/useConfirmStore';
 import AlumnoFormModal from './components/AlumnoFormModal';
 
 export default function AlumnosPage() {
@@ -33,7 +34,8 @@ export default function AlumnosPage() {
   const paginatedAlumnos = alumnos.slice((page - 1) * pageSize, page * pageSize);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Desactivar este alumno?')) return;
+    const confirmed = await showConfirm({ title: 'Desactivar alumno', message: '¿Seguro que querés desactivar este alumno?', confirmText: 'Desactivar', variant: 'danger' });
+    if (!confirmed) return;
     try {
       await api.delete(`/alumnos/${id}`);
       useToastStore.getState().success('Alumno desactivado');

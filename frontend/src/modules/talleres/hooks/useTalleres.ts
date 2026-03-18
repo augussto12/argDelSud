@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../../shared/api/client';
 import { useToastStore } from '../../../shared/hooks/useToastStore';
+import { showConfirm } from '../../../shared/hooks/useConfirmStore';
 import type { Taller, Dia, ApiResponse } from '../../../shared/types';
 import type { Profesor, DiaForm, InscriptoInfo } from '../types';
 import { EMPTY_FORM } from '../types';
@@ -140,7 +141,8 @@ export function useTalleres() {
   };
 
   const handleDesactivar = async (id: number) => {
-    if (!confirm('¿Seguro que querés desactivar este taller?')) return;
+    const confirmed = await showConfirm({ title: 'Desactivar taller', message: '¿Seguro que querés desactivar este taller?', confirmText: 'Desactivar', variant: 'danger' });
+    if (!confirmed) return;
     try {
       await api.delete(`/talleres/${id}`);
       useToastStore.getState().success('Taller desactivado');
@@ -190,7 +192,8 @@ export function useTalleres() {
   };
 
   const handleDesinscribir = async (tallerId: number, alumnoId: number) => {
-    if (!confirm('¿Desinscribir al alumno?')) return;
+    const confirmed = await showConfirm({ title: 'Desinscribir alumno', message: '¿Seguro que querés desinscribir al alumno de este taller?', confirmText: 'Desinscribir', variant: 'warning' });
+    if (!confirmed) return;
     try {
       await api.delete(`/talleres/${tallerId}/desinscribir/${alumnoId}`);
       useToastStore.getState().success('Alumno desinscripto');

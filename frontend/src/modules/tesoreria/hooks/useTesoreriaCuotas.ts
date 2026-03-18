@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../../shared/api/client';
 import { useToastStore } from '../../../shared/hooks/useToastStore';
+import { showConfirm } from '../../../shared/hooks/useConfirmStore';
 import type { Cuota, TallerOption } from '../types';
 
 export function useTesoreriaCuotas() {
@@ -79,7 +80,8 @@ export function useTesoreriaCuotas() {
   };
 
   const handleAnularCuota = async (id: number) => {
-    if (!confirm('¿Seguro que querés anular esta cuota?')) return;
+    const confirmed = await showConfirm({ title: 'Anular cuota', message: '¿Seguro que querés anular esta cuota? Esta acción no se puede deshacer.', confirmText: 'Anular', variant: 'danger' });
+    if (!confirmed) return;
     try {
       await api.patch(`/cuotas/${id}/anular`);
       useToastStore.getState().success('Cuota anulada');

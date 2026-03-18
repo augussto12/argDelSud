@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../../shared/api/client';
 import { useToastStore } from '../../../shared/hooks/useToastStore';
+import { showConfirm } from '../../../shared/hooks/useConfirmStore';
 
 export interface Usuario {
   id: number;
@@ -107,7 +108,8 @@ export function useUsuarios() {
   };
 
   const handleDesactivar = async (id: number) => {
-    if (!confirm('¿Seguro que querés desactivar este usuario?')) return;
+    const confirmed = await showConfirm({ title: 'Desactivar usuario', message: '¿Seguro que querés desactivar este usuario?', confirmText: 'Desactivar', variant: 'danger' });
+    if (!confirmed) return;
     try {
       await api.delete(`/usuarios/${id}`);
       useToastStore.getState().success('Usuario desactivado');
