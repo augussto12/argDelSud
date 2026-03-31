@@ -18,6 +18,14 @@ export const getMetricas = async (req: AuthRequest, res: Response): Promise<void
             "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
         ];
 
+        // Generar lista de periodos
+        const periodos = Array.from({ length: meses }, (_, i) => {
+            const fecha = new Date(anioActual, mesActual - 1 - i, 1);
+            return { mes: fecha.getMonth() + 1, anio: fecha.getFullYear() };
+        }).reverse();
+
+        const periodosFilter = periodos.map((p) => ({ mes: p.mes, anio: p.anio }));
+
         // ─── 1. Talleres activos ───
         const talleres = await prisma.taller.findMany({
             where: { activo: true },
@@ -25,80 +33,96 @@ export const getMetricas = async (req: AuthRequest, res: Response): Promise<void
             orderBy: { nombre: "asc" },
         });
 
-        // ─── 2. Cash flow mensual (últimos N meses) ───
-        const cashFlow: any[] = [];
-
-        for (let i = meses - 1; i >= 0; i--) {
-            const fecha = new Date(anioActual, mesActual - 1 - i, 1);
-            const mes = fecha.getMonth() + 1;
-            const anio = fecha.getFullYear();
-
-            // Total facturado (sum monto_final de cuotas no anuladas)
-            const facturado = await prisma.cuota.aggregate({
+        // ─── 2. Cash flow mensual con queries agrupadas ───
+        const [facturadosPorPeriodo, cobradosPorPeriodo, cuotasTotales, cuotasPagadasTotales] = await Promise.all([
+            // Facturado por mes/año
+            prisma.cuota.groupBy({
+                by: ["mes", "anio"],
                 _sum: { monto_final: true },
-                where: { mes, anio, estado: { not: "anulada" } },
-            });
+                _count: true,
+                where: { estado: { not: "anulada" }, OR: periodosFilter },
+            }),
+            // Cobrado por mes/año
+            prisma.pago.findMany({
+                where: { cuota: { OR: periodosFilter } },
+                select: {
+                    monto_abonado: true,
+                    cuota: { select: { mes: true, anio: true } },
+                },
+            }),
+            // Total cuotas (no anuladas) por periodo
+            prisma.cuota.groupBy({
+                by: ["mes", "anio"],
+                _count: true,
+                where: { estado: { not: "anulada" }, OR: periodosFilter },
+            }),
+            // Cuotas pagadas por periodo
+            prisma.cuota.groupBy({
+                by: ["mes", "anio"],
+                _count: true,
+                where: { estado: "pagada", OR: periodosFilter },
+            }),
+        ]);
 
-            // Total cobrado (sum monto_abonado de pagos de cuotas de ese mes)
-            const cobrado = await prisma.pago.aggregate({
-                _sum: { monto_abonado: true },
-                where: { cuota: { mes, anio } },
-            });
+        // Agrupar cobrados por mes/año
+        const cobradosMap = new Map<string, number>();
+        for (const pago of cobradosPorPeriodo) {
+            const key = `${pago.cuota.mes}-${pago.cuota.anio}`;
+            cobradosMap.set(key, (cobradosMap.get(key) || 0) + Number(pago.monto_abonado));
+        }
 
-            // Total cuotas y pagadas
-            const cuotasTotal = await prisma.cuota.count({
-                where: { mes, anio, estado: { not: "anulada" } },
-            });
-            const cuotasPagadas = await prisma.cuota.count({
-                where: { mes, anio, estado: "pagada" },
-            });
+        // Mapas de facturado, totales y pagadas
+        const facturadoMap = new Map(facturadosPorPeriodo.map((f) => [`${f.mes}-${f.anio}`, Number(f._sum.monto_final || 0)]));
+        const cuotasTotalMap = new Map(cuotasTotales.map((c) => [`${c.mes}-${c.anio}`, c._count]));
+        const cuotasPagadasMap = new Map(cuotasPagadasTotales.map((c) => [`${c.mes}-${c.anio}`, c._count]));
 
-            cashFlow.push({
-                periodo: `${MESES_NOMBRE[mes]} ${anio}`,
-                mes,
-                anio,
-                facturado: Number(facturado._sum.monto_final || 0),
-                cobrado: Number(cobrado._sum.monto_abonado || 0),
-                pendiente: Number(facturado._sum.monto_final || 0) - Number(cobrado._sum.monto_abonado || 0),
+        const cashFlow = periodos.map((p) => {
+            const key = `${p.mes}-${p.anio}`;
+            const facturado = facturadoMap.get(key) || 0;
+            const cobrado = cobradosMap.get(key) || 0;
+            const cuotasTotal = cuotasTotalMap.get(key) || 0;
+            const cuotasPagadas = cuotasPagadasMap.get(key) || 0;
+
+            return {
+                periodo: `${MESES_NOMBRE[p.mes]} ${p.anio}`,
+                mes: p.mes,
+                anio: p.anio,
+                facturado,
+                cobrado,
+                pendiente: facturado - cobrado,
                 cobrabilidad: cuotasTotal > 0 ? Math.round((cuotasPagadas / cuotasTotal) * 100) : 0,
                 cuotasTotal,
                 cuotasPagadas,
-            });
-        }
+            };
+        });
 
-        // ─── 3. Ranking de talleres por recaudación ───
-        const rankingTalleres: any[] = [];
-        for (const taller of talleres) {
-            const recaudado = await prisma.pago.aggregate({
-                _sum: { monto_abonado: true },
-                where: {
-                    cuota: {
-                        inscripcion: { taller_id: taller.id },
-                    },
-                },
-            });
+        // ─── 3. Ranking de talleres (queries en paralelo) ───
+        const rankingTalleres = await Promise.all(
+            talleres.map(async (taller) => {
+                const [recaudado, inscriptosActivos, cuotasPendientes] = await Promise.all([
+                    prisma.pago.aggregate({
+                        _sum: { monto_abonado: true },
+                        where: { cuota: { inscripcion: { taller_id: taller.id } } },
+                    }),
+                    prisma.inscripcion.count({
+                        where: { taller_id: taller.id, activa: true },
+                    }),
+                    prisma.cuota.count({
+                        where: { inscripcion: { taller_id: taller.id }, estado: "pendiente" },
+                    }),
+                ]);
 
-            const inscriptosActivos = await prisma.inscripcion.count({
-                where: { taller_id: taller.id, activa: true },
-            });
-
-            const cuotasPendientes = await prisma.cuota.count({
-                where: {
-                    inscripcion: { taller_id: taller.id },
-                    estado: "pendiente",
-                },
-            });
-
-            rankingTalleres.push({
-                id: taller.id,
-                nombre: taller.nombre,
-                precio_mensual: Number(taller.precio_mensual),
-                recaudado: Number(recaudado._sum.monto_abonado || 0),
-                inscriptos: inscriptosActivos,
-                cuotasPendientes,
-                proyeccion_mensual: inscriptosActivos * Number(taller.precio_mensual),
-            });
-        }
+                return {
+                    id: taller.id,
+                    nombre: taller.nombre,
+                    precio_mensual: Number(taller.precio_mensual),
+                    recaudado: Number(recaudado._sum.monto_abonado || 0),
+                    inscriptos: inscriptosActivos,
+                    cuotasPendientes,
+                    proyeccion_mensual: inscriptosActivos * Number(taller.precio_mensual),
+                };
+            })
+        );
 
         rankingTalleres.sort((a, b) => b.recaudado - a.recaudado);
 
@@ -125,20 +149,22 @@ export const getMetricas = async (req: AuthRequest, res: Response): Promise<void
             _sum: { descuento_aplicado: true },
         });
 
-        // Proyección mensual total (todos los inscrptos × precio)
+        // Proyección mensual total
         const totalProyeccion = rankingTalleres.reduce((s, t) => s + t.proyeccion_mensual, 0);
 
         // Alumnos activos
-        const alumnosActivos = await prisma.alumno.count({ where: { activo: true } });
-        const totalInscripcionesActivas = await prisma.inscripcion.count({ where: { activa: true } });
+        const [alumnosActivos, totalInscripcionesActivas] = await Promise.all([
+            prisma.alumno.count({ where: { activo: true } }),
+            prisma.inscripcion.count({ where: { activa: true } }),
+        ]);
 
         res.json({
             ok: true,
             data: {
                 resumen: {
-                    recaudadoMesActual: mesActualData.cobrado || 0,
-                    facturadoMesActual: mesActualData.facturado || 0,
-                    cobrabilidadMesActual: mesActualData.cobrabilidad || 0,
+                    recaudadoMesActual: (mesActualData as any).cobrado || 0,
+                    facturadoMesActual: (mesActualData as any).facturado || 0,
+                    cobrabilidadMesActual: (mesActualData as any).cobrabilidad || 0,
                     proyeccionMensual: totalProyeccion,
                     deudaTotal: Number(totalDeuda),
                     totalBecasDescuento: Number(totalBecas._sum.descuento_aplicado || 0),
@@ -154,3 +180,4 @@ export const getMetricas = async (req: AuthRequest, res: Response): Promise<void
         res.status(500).json({ ok: false, message: "Error interno del servidor." });
     }
 };
+

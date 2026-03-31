@@ -1,6 +1,7 @@
 import { Express } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { config } from "./app.config";
 
 export function configureSecurity(app: Express) {
     // Helmet: headers de seguridad
@@ -8,8 +9,8 @@ export function configureSecurity(app: Express) {
 
     // Rate Limiting global
     const limiter = rateLimit({
-        windowMs: 15 * 60 * 1000, // 15 minutos
-        max: 200,
+        windowMs: config.rateLimit.global.windowMs,
+        max: config.rateLimit.global.max,
         standardHeaders: true,
         legacyHeaders: false,
         message: { ok: false, message: "Demasiadas peticiones. Intentá más tarde." },
@@ -18,8 +19,8 @@ export function configureSecurity(app: Express) {
 
     // Rate Limiting estricto para auth
     const authLimiter = rateLimit({
-        windowMs: 15 * 60 * 1000,
-        max: 20,
+        windowMs: config.rateLimit.auth.windowMs,
+        max: config.rateLimit.auth.max,
         standardHeaders: true,
         legacyHeaders: false,
         message: { ok: false, message: "Demasiados intentos de login." },

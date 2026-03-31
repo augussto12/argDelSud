@@ -66,8 +66,7 @@ export const getAlumnoById = async (req: AuthRequest, res: Response): Promise<vo
 
 export const createAlumno = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const data = req.body;
-        data.fecha_nacimiento = new Date(data.fecha_nacimiento);
+        const data = { ...req.body, fecha_nacimiento: new Date(req.body.fecha_nacimiento) };
 
         const existing = await prisma.alumno.findUnique({ where: { dni: data.dni } });
         if (existing) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Users, GraduationCap, Building2, ClipboardCheck,
   TrendingUp, Calendar, Percent
@@ -63,9 +63,9 @@ export default function DashboardPage() {
   ];
 
   // Find max total for bar chart scaling
-  const maxTotal = recaudacion?.recaudacion
-    ? Math.max(...recaudacion.recaudacion.map(r => r.total), 1)
-    : 1;
+  const maxTotal = useMemo(() => recaudacion?.recaudacion
+    ? Math.max(...recaudacion.recaudacion.map((r: Record<string, any>) => r.total), 1)
+    : 1, [recaudacion]);
 
   const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 

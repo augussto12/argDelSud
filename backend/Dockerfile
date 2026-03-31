@@ -13,13 +13,15 @@ RUN npm ci
 COPY prisma ./prisma
 RUN npx prisma generate
 
-# Copiar código fuente
+# Copiar código fuente y compilar TypeScript
 COPY src ./src
 COPY tsconfig.json ./
+RUN npm run build
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:3000/api/health || exit 1
 
-CMD ["npx", "ts-node", "src/index.ts"]
+CMD ["node", "dist/index.js"]
+

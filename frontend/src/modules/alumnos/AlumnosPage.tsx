@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import api from '../../shared/api/client';
 import type { Alumno, ApiResponse } from '../../shared/types';
 import { Plus, Search, Pencil, Ban, Users } from 'lucide-react';
@@ -8,6 +8,7 @@ import TablePagination from '../../shared/components/TablePagination';
 import { useToastStore } from '../../shared/hooks/useToastStore';
 import { showConfirm } from '../../shared/hooks/useConfirmStore';
 import AlumnoFormModal from './components/AlumnoFormModal';
+import { useDebounce } from '../../shared/hooks/useDebounce';
 
 export default function AlumnosPage() {
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
@@ -18,18 +19,20 @@ export default function AlumnosPage() {
   const [pageSize, setPageSize] = useState(25);
   const [editingAlumno, setEditingAlumno] = useState<Alumno | null>(null);
 
-  const fetchAlumnos = async () => {
+  const debouncedSearch = useDebounce(search, 300);
+
+  const fetchAlumnos = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = { activo: 'true' };
-      if (search) params.search = search;
+      if (debouncedSearch) params.search = debouncedSearch;
       const res = await api.get<ApiResponse<Alumno[]>>('/alumnos', { params });
       setAlumnos(res.data?.data ?? []);
     } catch (_e) { setAlumnos([]); }
     finally { setLoading(false); }
-  };
+  }, [debouncedSearch]);
 
-  useEffect(() => { setPage(1); fetchAlumnos(); }, [search]);
+  useEffect(() => { setPage(1); fetchAlumnos(); }, [debouncedSearch]);
 
   const paginatedAlumnos = alumnos.slice((page - 1) * pageSize, page * pageSize);
 

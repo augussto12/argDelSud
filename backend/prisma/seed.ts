@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
@@ -24,10 +25,9 @@ async function main() {
     }
 
     // Seed usuario admin por defecto
-    const bcrypt = require("bcrypt");
     const adminRol = await prisma.rol.findUnique({ where: { nombre: "superadmin" } });
     if (adminRol) {
-        const hashedPassword = await bcrypt.hash("admin123", 10);
+        const hashedPassword = await bcrypt.hash("admin123", 12);
         await prisma.usuario.upsert({
             where: { email: "admin@argdelsud.com" },
             update: {},

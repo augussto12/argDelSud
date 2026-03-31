@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuthStore } from './authStore';
+import { useAuthStore } from '../../shared/hooks/useAuthStore';
 import { Mail, Lock, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import escudo from '../../assets/argdelsur.png';
 

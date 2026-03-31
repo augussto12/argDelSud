@@ -4,6 +4,9 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Validar env vars ANTES de importar módulos que las usen
+import "./shared/config/env";
+import { config } from "./shared/config/app.config";
 import { configureSecurity } from "./shared/config/security";
 import { globalErrorHandler } from "./shared/middlewares/errorHandler";
 import logger from "./shared/utils/logger";
@@ -22,18 +25,13 @@ import auditoriaRoutes from "./modules/auditoria/auditoria.routes";
 import metricasRoutes from "./modules/metricas/metricas.routes";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // 1. Trust proxy
 app.set("trust proxy", 1);
 
 // 2. CORS
 app.use(cors({
-    origin: [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        process.env.FRONTEND_URL || "",
-    ].filter(Boolean),
+    origin: config.cors.origins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -42,8 +40,8 @@ app.use(cors({
 // 3. Seguridad
 configureSecurity(app);
 
-// 4. Body parser (con límite de 1MB para prevenir DoS)
-app.use(express.json({ limit: "1mb" }));
+// 4. Body parser (con límite para prevenir DoS)
+app.use(express.json({ limit: config.bodyParser.limit }));
 
 // 5. Health Check
 app.get("/api/health", async (_req, res) => {
@@ -72,7 +70,23 @@ app.use("/api/metricas", metricasRoutes);
 // 7. Manejo global de errores
 app.use(globalErrorHandler);
 
-// 8. Servidor listo
-app.listen(Number(PORT), "0.0.0.0", () => {
-    logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "🚀 argDelSud API lista");
+// 8. Graceful shutdown
+process.on("SIGTERM", async () => {
+    logger.info("SIGTERM recibido. Cerrando servidor...");
+    const prisma = (await import("./prismaClient")).default;
+    await prisma.$disconnect();
+    process.exit(0);
 });
+
+process.on("SIGINT", async () => {
+    logger.info("SIGINT recibido. Cerrando servidor...");
+    const prisma = (await import("./prismaClient")).default;
+    await prisma.$disconnect();
+    process.exit(0);
+});
+
+// 9. Servidor listo
+app.listen(config.port, "0.0.0.0", () => {
+    logger.info({ port: config.port, env: config.nodeEnv }, "🚀 argDelSud API lista");
+});
+

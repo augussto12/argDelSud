@@ -11,9 +11,16 @@ export default function MainLayout() {
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
   useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth >= 1024);
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const handler = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => setIsDesktop(window.innerWidth >= 1024), 150);
+    };
     window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', handler);
+    };
   }, []);
 
   const marginLeft = isDesktop ? (sidebarOpen ? 256 : 72) : 0;

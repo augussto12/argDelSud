@@ -2,6 +2,7 @@ import { Response } from "express";
 import prisma from "../../prismaClient";
 import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
+import { parseId } from "../../shared/utils/parseId";
 
 // Pasar lista masivo (un taller, una fecha, todos los alumnos)
 export const registrarAsistencia = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -10,8 +11,8 @@ export const registrarAsistencia = async (req: AuthRequest, res: Response): Prom
         const fechaDate = new Date(fecha);
         const userId = req.user?.id || null;
 
-        // Upsert de cada asistencia
-        const results = await Promise.all(
+        // Usar transacción para garantizar atomicidad
+        const results = await prisma.$transaction(
             asistencias.map((a: { alumno_id: number; presente: boolean }) =>
                 prisma.asistencia.upsert({
                     where: {
@@ -43,7 +44,7 @@ export const registrarAsistencia = async (req: AuthRequest, res: Response): Prom
 // Obtener asistencia de un taller en una fecha
 export const getAsistenciaPorTallerFecha = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const taller_id = parseInt(req.params.taller_id as string);
+        const taller_id = parseId(req.params.taller_id, "taller_id");
         const { fecha } = req.query;
 
         if (!fecha || typeof fecha !== "string") {
@@ -70,7 +71,11 @@ export const getAsistenciaPorTallerFecha = async (req: AuthRequest, res: Respons
         }));
 
         res.json({ ok: true, data: lista });
-    } catch (err) {
+    } catch (err: any) {
+        if (err.statusCode) {
+            res.status(err.statusCode).json({ ok: false, message: err.message });
+            return;
+        }
         logger.error({ err }, "Error obteniendo asistencia");
         res.status(500).json({ ok: false, message: "Error interno del servidor." });
     }
@@ -79,11 +84,11 @@ export const getAsistenciaPorTallerFecha = async (req: AuthRequest, res: Respons
 // Historial de asistencia de un alumno
 export const getAsistenciaAlumno = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const alumno_id = parseInt(req.params.alumno_id as string);
+        const alumno_id = parseId(req.params.alumno_id, "alumno_id");
         const { taller_id, desde, hasta } = req.query;
 
         const where: any = { alumno_id };
-        if (taller_id) where.taller_id = parseInt(taller_id as string);
+        if (taller_id) where.taller_id = parseId(taller_id as string, "taller_id");
         if (desde || hasta) {
             where.fecha = {};
             if (desde) where.fecha.gte = new Date(desde as string);
@@ -104,8 +109,13 @@ export const getAsistenciaAlumno = async (req: AuthRequest, res: Response): Prom
             data: asistencias,
             resumen: { total, presentes, ausentes: total - presentes },
         });
-    } catch (err) {
+    } catch (err: any) {
+        if (err.statusCode) {
+            res.status(err.statusCode).json({ ok: false, message: err.message });
+            return;
+        }
         logger.error({ err }, "Error obteniendo asistencia de alumno");
         res.status(500).json({ ok: false, message: "Error interno del servidor." });
     }
 };
+

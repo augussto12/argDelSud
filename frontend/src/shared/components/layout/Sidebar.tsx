@@ -18,23 +18,33 @@ import {
 } from 'lucide-react';
 import escudo from '../../../assets/argdelsur.png';
 
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+interface NavItem {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles?: string[]; // Si está definido, solo estos roles lo ven
+}
+
+const allNavItems: NavItem[] = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['superadmin', 'admin'] },
   { to: '/alumnos', label: 'Alumnos', icon: Users },
   { to: '/profesores', label: 'Profesores', icon: GraduationCap },
   { to: '/talleres', label: 'Talleres', icon: Building2 },
   { to: '/asistencia', label: 'Asistencia', icon: ClipboardCheck },
-  { to: '/tesoreria', label: 'Tesorería', icon: DollarSign },
-  { to: '/becas', label: 'Becas', icon: Award },
-  { to: '/metricas', label: 'Métricas', icon: BarChart3 },
-  { to: '/auditoria', label: 'Auditoría', icon: ScrollText },
-  { to: '/usuarios', label: 'Usuarios', icon: Shield },
+  { to: '/tesoreria', label: 'Tesorería', icon: DollarSign, roles: ['superadmin', 'admin'] },
+  { to: '/becas', label: 'Becas', icon: Award, roles: ['superadmin', 'admin'] },
+  { to: '/metricas', label: 'Métricas', icon: BarChart3, roles: ['superadmin', 'admin'] },
+  { to: '/auditoria', label: 'Auditoría', icon: ScrollText, roles: ['superadmin'] },
+  { to: '/usuarios', label: 'Usuarios', icon: Shield, roles: ['superadmin'] },
 ];
 
 export default function Sidebar() {
   const { sidebarOpen, toggleSidebar, mobileSidebarOpen, closeMobileSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
   const location = useLocation();
+
+  // Filtrar items por rol del usuario
+  const navItems = allNavItems.filter(item => !item.roles || (user?.rol && item.roles.includes(user.rol)));
 
   // Desktop sidebar width: open=256px, collapsed=72px
   // Mobile: full overlay drawer
@@ -67,7 +77,7 @@ export default function Sidebar() {
             <X size={18} />
           </button>
         </div>
-        <NavList onNavClick={closeMobileSidebar} expanded location={location} />
+        <NavList items={navItems} onNavClick={closeMobileSidebar} expanded location={location} />
         <UserSection expanded user={user} logout={logout} />
       </aside>
 
@@ -95,7 +105,7 @@ export default function Sidebar() {
             <ChevronLeft size={16} className={`transition-transform duration-300 ${!sidebarOpen ? 'rotate-180' : ''}`} />
           </button>
         </div>
-        <NavList expanded={sidebarOpen} location={location} />
+        <NavList items={navItems} expanded={sidebarOpen} location={location} />
         <UserSection expanded={sidebarOpen} user={user} logout={logout} />
       </aside>
     </>
@@ -103,13 +113,13 @@ export default function Sidebar() {
 }
 
 /* ─── Shared Nav List ─── */
-function NavList({ expanded, location, onNavClick }: { expanded: boolean; location: ReturnType<typeof useLocation>; onNavClick?: () => void }) {
+function NavList({ items, expanded, location, onNavClick }: { items: NavItem[]; expanded: boolean; location: ReturnType<typeof useLocation>; onNavClick?: () => void }) {
   return (
     <nav className="flex-1 py-4 px-3 overflow-y-auto space-y-1">
       {expanded && (
         <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/20 px-3 mb-3">Menú</p>
       )}
-      {navItems.map(({ to, label, icon: Icon }) => {
+      {items.map(({ to, label, icon: Icon }) => {
         const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
         return (
           <NavLink key={to} to={to} onClick={onNavClick}

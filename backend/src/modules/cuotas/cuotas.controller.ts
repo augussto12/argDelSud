@@ -389,7 +389,7 @@ export const generarCuotasMasivo = async (req: AuthRequest, res: Response): Prom
                         becas: {
                             where: {
                                 activa: true,
-                                fecha_inicio: { lte: new Date(anio, mes - 1, 28) },
+                                fecha_inicio: { lte: new Date(anio, mes, 0) }, // último día real del mes
                                 fecha_fin: { gte: new Date(anio, mes - 1, 1) },
                             },
                         },

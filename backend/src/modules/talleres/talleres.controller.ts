@@ -156,32 +156,36 @@ export const inscribirAlumno = async (req: AuthRequest, res: Response): Promise<
         const taller_id = parseId(req.params.id, "taller_id");
         const { alumno_id } = req.body;
 
-        // Verificar cupo
-        const taller = await prisma.taller.findUnique({
-            where: { id: taller_id },
-            include: { _count: { select: { inscripciones: { where: { activa: true } } } } },
-        });
+        // Usar transacción para evitar race condition en cupo
+        const inscripcion = await prisma.$transaction(async (tx) => {
+            const taller = await tx.taller.findUnique({
+                where: { id: taller_id },
+                include: { _count: { select: { inscripciones: { where: { activa: true } } } } },
+            });
 
-        if (!taller) {
-            res.status(404).json({ ok: false, message: "Taller no encontrado." });
-            return;
-        }
+            if (!taller) {
+                throw { statusCode: 404, message: "Taller no encontrado." };
+            }
 
-        if (taller._count.inscripciones >= taller.cupo_maximo) {
-            res.status(409).json({ ok: false, message: "El taller está lleno." });
-            return;
-        }
+            if (taller._count.inscripciones >= taller.cupo_maximo) {
+                throw { statusCode: 409, message: "El taller está lleno." };
+            }
 
-        const inscripcion = await prisma.inscripcion.upsert({
-            where: { alumno_id_taller_id: { alumno_id, taller_id } },
-            update: { activa: true },
-            create: { alumno_id, taller_id },
+            return tx.inscripcion.upsert({
+                where: { alumno_id_taller_id: { alumno_id, taller_id } },
+                update: { activa: true },
+                create: { alumno_id, taller_id },
+            });
         });
 
         await auditLog({ req, accion: 'inscribir_alumno', entidad: 'inscripcion', entidad_id: inscripcion.id, detalle: { alumno_id, taller_id } });
 
         res.status(201).json({ ok: true, data: inscripcion });
-    } catch (err) {
+    } catch (err: any) {
+        if (err.statusCode) {
+            res.status(err.statusCode).json({ ok: false, message: err.message });
+            return;
+        }
         logger.error({ err }, "Error inscribiendo alumno");
         res.status(500).json({ ok: false, message: "Error interno del servidor." });
     }

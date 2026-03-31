@@ -5,6 +5,7 @@ import prisma from "../../prismaClient";
 import { AuthRequest } from "../../shared/middlewares/authMiddleware";
 import logger from "../../shared/utils/logger";
 import { auditLog } from "../../shared/utils/auditLog";
+import { config } from "../../shared/config/app.config";
 
 export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -26,13 +27,10 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
             return;
         }
 
-        const secret = process.env.JWT_SECRET;
-        if (!secret) throw new Error("JWT_SECRET no configurado");
-
         const token = jwt.sign(
             { id: usuario.id, email: usuario.email, rol: usuario.rol.nombre },
-            secret,
-            { expiresIn: "4h" }
+            config.jwt.secret,
+            { expiresIn: config.jwt.expiresIn, algorithm: config.jwt.algorithm }
         );
 
         // Simular user en req para el auditLog

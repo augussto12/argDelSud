@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './shared/hooks/useAuthStore';
 import MainLayout from './shared/components/layout/MainLayout';
 import PageLoader from './shared/components/PageLoader';
+import ErrorBoundary from './shared/components/ErrorBoundary';
 
 // Lazy-loaded page modules (code-split per route)
 const LoginPage = lazy(() => import('./modules/auth/LoginPage'));
@@ -23,6 +24,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RoleRoute({ roles, children }: { roles: string[]; children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  if (!user || !roles.includes(user.rol)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   const { checkAuth } = useAuthStore();
 
@@ -38,20 +45,27 @@ export default function App() {
           <Route
             element={
               <ProtectedRoute>
-                <MainLayout />
+                <ErrorBoundary>
+                  <MainLayout />
+                </ErrorBoundary>
               </ProtectedRoute>
             }
           >
-            <Route path="/" element={<DashboardPage />} />
+            {/* Acceso: todos los roles */}
+            <Route path="/" element={<RoleRoute roles={['superadmin', 'admin']}><DashboardPage /></RoleRoute>} />
             <Route path="/alumnos" element={<AlumnosPage />} />
             <Route path="/profesores" element={<ProfesoresPage />} />
             <Route path="/talleres" element={<TalleresPage />} />
             <Route path="/asistencia" element={<AsistenciaPage />} />
-            <Route path="/tesoreria" element={<TesoreriaPage />} />
-            <Route path="/becas" element={<BecasPage />} />
-            <Route path="/metricas" element={<MetricasPage />} />
-            <Route path="/auditoria" element={<AuditoriaPage />} />
-            <Route path="/usuarios" element={<UsuariosPage />} />
+
+            {/* Acceso: admin + superadmin */}
+            <Route path="/tesoreria" element={<RoleRoute roles={['superadmin', 'admin']}><TesoreriaPage /></RoleRoute>} />
+            <Route path="/becas" element={<RoleRoute roles={['superadmin', 'admin']}><BecasPage /></RoleRoute>} />
+            <Route path="/metricas" element={<RoleRoute roles={['superadmin', 'admin']}><MetricasPage /></RoleRoute>} />
+
+            {/* Acceso: solo superadmin */}
+            <Route path="/auditoria" element={<RoleRoute roles={['superadmin']}><AuditoriaPage /></RoleRoute>} />
+            <Route path="/usuarios" element={<RoleRoute roles={['superadmin']}><UsuariosPage /></RoleRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -59,3 +73,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+

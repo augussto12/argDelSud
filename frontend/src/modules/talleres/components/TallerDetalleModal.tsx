@@ -1,5 +1,5 @@
 import Modal from '../../../shared/components/Modal';
-import { Clock, UserPlus } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 interface Props {
   taller: any;

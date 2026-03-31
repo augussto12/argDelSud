@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useConfirmStore } from '../hooks/useConfirmStore';
 import { AlertTriangle, Info } from 'lucide-react';
 
@@ -18,6 +19,16 @@ const variantStyles = {
 
 export default function ConfirmModal() {
   const { isOpen, options, confirm, cancel } = useConfirmStore();
+
+  // Cerrar con Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cancel();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, cancel]);
 
   if (!isOpen) return null;
 

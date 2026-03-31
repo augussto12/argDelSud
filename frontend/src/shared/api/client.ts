@@ -15,20 +15,31 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor: maneja 401 (token expirado)
+// Interceptor: maneja 401 (token expirado) y 403 (usuario desactivado)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // No redirigir si estamos en el login (el 401 es por credenciales incorrectas)
-      const isLoginRequest = error.config?.url?.includes('/auth/login');
-      if (!isLoginRequest) {
+    const status = error.response?.status;
+    const isLoginRequest = error.config?.url?.includes('/auth/login');
+
+    if (status === 401 && !isLoginRequest) {
+      // Token expirado o inválido
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+
+    if (status === 403 && !isLoginRequest) {
+      // Usuario desactivado — el backend ahora verifica activo en cada request
+      const message = error.response?.data?.message || '';
+      if (message.includes('desactivado')) {
         localStorage.removeItem('token');
         window.location.href = '/login';
       }
     }
+
     return Promise.reject(error);
   }
 );
 
 export default api;
+

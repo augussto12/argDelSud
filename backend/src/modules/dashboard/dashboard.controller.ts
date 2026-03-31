@@ -45,6 +45,11 @@ export const getRecaudacion = async (req: AuthRequest, res: Response): Promise<v
         const meses = parseInt((req.query.meses as string) || "6");
         const now = new Date();
 
+        // Calcular rango de fechas
+        const fechaDesde = new Date(now.getFullYear(), now.getMonth() - meses + 1, 1);
+        const mesDesde = fechaDesde.getMonth() + 1;
+        const anioDesde = fechaDesde.getFullYear();
+
         // Obtener talleres activos
         const talleres = await prisma.taller.findMany({
             where: { activo: true },
@@ -52,57 +57,91 @@ export const getRecaudacion = async (req: AuthRequest, res: Response): Promise<v
             orderBy: { nombre: "asc" },
         });
 
-        // Para cada mes, sumar pagos agrupados por taller
-        const resultado: any[] = [];
+        // UNA sola query agrupada: pagos por taller/mes/año
+        const pagosAgrupados = await prisma.pago.groupBy({
+            by: ["cuota_id"],
+            _sum: { monto_abonado: true },
+            where: {
+                cuota: {
+                    OR: Array.from({ length: meses }, (_, i) => {
+                        const fecha = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                        return { mes: fecha.getMonth() + 1, anio: fecha.getFullYear() };
+                    }),
+                },
+            },
+        });
 
+        // Obtener las cuotas con su taller para poder pivotar
+        const cuotaIds = pagosAgrupados.map((p) => p.cuota_id);
+        const cuotas = cuotaIds.length > 0
+            ? await prisma.cuota.findMany({
+                where: { id: { in: cuotaIds } },
+                select: {
+                    id: true,
+                    mes: true,
+                    anio: true,
+                    inscripcion: { select: { taller_id: true } },
+                },
+            })
+            : [];
+
+        // Mapear cuota_id → { mes, anio, taller_id }
+        const cuotaMap = new Map(cuotas.map((c) => [c.id, c]));
+
+        // Construir resultado pivotado
+        const MESES_NOMBRE = [
+            "", "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+            "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+        ];
+
+        const resultado: any[] = [];
         for (let i = meses - 1; i >= 0; i--) {
             const fecha = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const mes = fecha.getMonth() + 1;
             const anio = fecha.getFullYear();
 
-            const mesesNombre = [
-                "", "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-                "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
-            ];
-
             const entry: any = {
-                periodo: `${mesesNombre[mes]} ${anio}`,
+                periodo: `${MESES_NOMBRE[mes]} ${anio}`,
                 mes,
                 anio,
                 total: 0,
             };
 
-            // Sumar pagos de cuotas de ese mes/año
             for (const taller of talleres) {
-                const pagos = await prisma.pago.aggregate({
-                    _sum: { monto_abonado: true },
-                    where: {
-                        cuota: {
-                            mes,
-                            anio,
-                            inscripcion: { taller_id: taller.id },
-                        },
-                    },
-                });
-
-                const montoTaller = Number(pagos._sum.monto_abonado || 0);
-                entry[taller.nombre] = montoTaller;
-                entry.total += montoTaller;
+                entry[taller.nombre] = 0;
             }
 
             resultado.push(entry);
         }
 
-        // También calcular cobrabilidad del mes actual
+        // Llenar con datos
+        for (const pago of pagosAgrupados) {
+            const cuota = cuotaMap.get(pago.cuota_id);
+            if (!cuota) continue;
+
+            const taller = talleres.find((t) => t.id === cuota.inscripcion.taller_id);
+            if (!taller) continue;
+
+            const entry = resultado.find((r) => r.mes === cuota.mes && r.anio === cuota.anio);
+            if (!entry) continue;
+
+            const monto = Number(pago._sum.monto_abonado || 0);
+            entry[taller.nombre] = (entry[taller.nombre] || 0) + monto;
+            entry.total += monto;
+        }
+
+        // Cobrabilidad del mes actual
         const mesActual = now.getMonth() + 1;
         const anioActual = now.getFullYear();
 
-        const cuotasMesActual = await prisma.cuota.count({
-            where: { mes: mesActual, anio: anioActual, estado: { not: "anulada" } },
-        });
-        const cuotasPagadasMesActual = await prisma.cuota.count({
-            where: { mes: mesActual, anio: anioActual, estado: "pagada" },
-        });
+        const [cuotasMesActual, cuotasPagadasMesActual] = await Promise.all([
+            prisma.cuota.count({
+                where: { mes: mesActual, anio: anioActual, estado: { not: "anulada" } },
+            }),
+            prisma.cuota.count({
+                where: { mes: mesActual, anio: anioActual, estado: "pagada" },
+            }),
+        ]);
 
         const cobrabilidad = cuotasMesActual > 0
             ? Math.round((cuotasPagadasMesActual / cuotasMesActual) * 100)

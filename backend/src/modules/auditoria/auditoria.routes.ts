@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { getAuditLogs } from "./auditoria.controller";
-import { authenticateToken } from "../../shared/middlewares/authMiddleware";
+import { authenticateToken, authorizeRole } from "../../shared/middlewares/authMiddleware";
 
 const router = Router();
 
 router.use(authenticateToken);
 
-router.get("/", getAuditLogs);
+router.get("/", authorizeRole(["superadmin"]), getAuditLogs);
 
 export default router;
