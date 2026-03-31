@@ -13,8 +13,8 @@ services:
       - NODE_ENV=production
     networks:
       - default
-      - web_network
-      - db_network
+      - nginx-proxy-manager_default
+      - db-principal_default
 
   # ── Frontend Vite + Nginx ──
   frontend:
@@ -27,12 +27,11 @@ services:
       - backend
     networks:
       - default
-      - web_network
+      - nginx-proxy-manager_default
 
 networks:
-  web_network:
+  nginx-proxy-manager_default:
     external: true
-    name: nginx-proxy-manager_default
-  db_network:
+  db-principal_default:
     external: true
-    name: db-principal_default
+
